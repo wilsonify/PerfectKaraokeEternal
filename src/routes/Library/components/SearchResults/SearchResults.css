@@ -1,9 +1,0 @@
-.artistsHeading,
-.songsHeading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-color);
-  background-color: hsl(var(--hue-blue), 90%, 25%);
-  font-size: 18px;
-}

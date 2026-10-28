@@ -1,50 +1,112 @@
-# Karaoke Eternal
+# Perfect Karaoke
 
-Host awesome karaoke parties where everyone can easily find and queue songs from their phone's browser. The player is also fully browser-based with support for MP3+G, MP4 videos and WebGL visualizations. The server is self-hosted and runs on nearly everything.
+A local karaoke player for MP3+G (CD+G) and MP4 files. Open a folder of songs in
+your browser, build a queue, and sing. Everything runs in the browser: there is no
+server component, no accounts, no uploads, and no build step.
 
-[![Karaoke Eternal](/docs/assets/images/README.jpg?raw=true)](/docs/assets/images/README.jpg?raw=true)
-
-<p align="center">
-  <i>App in mobile browser (top) controlling player in desktop browser (bottom)</i>
-</p>
+![Perfect Karaoke player](assets/screenshot.png)
 
 ## Features
 
-- Plays:
-  - MP3+G (MP3 with CDG lyrics; including zipped)
-  - MP4 videos
-  - Music-synced visualizations (with automatic lyrics background removal)
-- Fast, modern mobile browser app designed for "karaoke conditions"
-- Easy joining with QR codes and guest accounts
-- Multiple simultaneous rooms/queues (optionally password-protected)
-- Dynamic queues keep parties fair, fun and no-fuss
-- Fully self-hosted
-- No ads or telemetry
+- MP3+G tracks (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac` with a matching `.cdg`)
+- Zipped MP3+G archives, including archives with several songs or extra files
+- MP4 karaoke videos
+- CD+G lyrics rendering with adjustable size and background dimming
+- Optional audio-reactive visualizer behind the lyrics
+- Library grouped by artist with alphabet jump, favourites and search
+- Queue with drag-and-drop reordering, history and "play now"
+- Optional ReplayGain volume leveling
+- Keyboard shortcuts, fullscreen, and remembered volume/display settings
+- Your library never leaves the computer - files are read locally by the browser
 
-Microphones are *not* required since the player itself only outputs music - this allows your audio setup to be as simple or complex as you like. See the [F.A.Q.](https://www.karaoke-eternal.com/faq/#recommended-audio-microphone-setup) for more information.
+## Requirements
 
-## Getting Started
+- [Node.js](https://nodejs.org/) 20 or newer, used only to serve the static files
+- A modern browser. Chrome or Edge are recommended because they support the
+  File System Access API, which lets the player remember your music folder between
+  visits. Other browsers can still load songs with **Add files** or drag-and-drop.
 
- Karaoke Eternal basically has 3 parts. See [Getting Started](https://www.karaoke-eternal.com/docs/getting-started/) to get up and running step-by-step, or jump to the documentation for each part below:
- 
-- **[Server:](https://www.karaoke-eternal.com/docs/karaoke-eternal-server/)** Runs on pretty much anything to serve the web app and your media files, including a Windows PC, Mac, or a dedicated server like a Raspberry Pi or Synology NAS.
-- **[App:](https://www.karaoke-eternal.com/docs/karaoke-eternal-app/)** Fast, modern mobile web app designed for "karaoke conditions".
-- **[Player:](https://www.karaoke-eternal.com/docs/karaoke-eternal-app/#player)** Just another part of the app, but meant to run fullscreen on the system handling audio/video for a [room](https://www.karaoke-eternal.com/docs/karaoke-eternal-app/#rooms-admin-only)
+## Running
 
-## Installation
+```bash
+npm start
+```
 
-There are several [installation methods](https://www.karaoke-eternal.com/docs/karaoke-eternal-server/#installation) available for Karaoke Eternal Server.
+Then open <http://localhost:3000>. No `npm install` is needed: the app has no
+runtime dependencies, and `serve.js` uses only Node's standard library.
 
-## Discord & Support
+To use another port:
 
-Join the [Karaoke Eternal Discord Server](https://discord.gg/PgqVtFq) for general support and development chat, or just to say hi!
+```bash
+node serve.js --port 8080
+# or
+PORT=8080 npm start
+```
 
-## Contributing & Development
+Opening `index.html` straight from disk does not work, because browsers refuse to
+load ES modules over `file://`.
 
-Contributions are welcome! Please join the `#dev` channel of the [Discord Server](https://discord.gg/PgqVtFq) before embarking on major features; the project's scope is limited to ensure success.
+## Song files
 
-Make sure you have [Node.js](https://nodejs.org/en/) v24 or later, then:
+Name audio and lyrics files the same way in the same folder:
 
-1. Fork and clone the repo
-2. `npm i`
-3. `npm run dev` and look for "Web server running at" for the **server URL**
+```text
+Queen - Bohemian Rhapsody.mp3
+Queen - Bohemian Rhapsody.cdg
+```
+
+Zipped tracks work too, as long as the audio and `.cdg` inside share a name:
+
+```text
+Queen - BoRhap.zip
+  Queen - BoRhap.mp3
+  Queen - BoRhap.cdg
+```
+
+The filename parser understands the naming conventions karaoke libraries tend to
+use: `The`-article handling (`Beatles, The`), track numbers (`AZ1234-01 - ...`),
+`ft.`/`feat.` variants, `[Karaoke]`-style suffixes, and `in the style of ...` titles.
+
+Files that cannot be used are not silently dropped: anything without a matching
+`.cdg`, or without an `Artist - Title` separator in the name, is counted in the
+"files skipped during the scan" notice above the library.
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `Space` | Play / pause |
+| `←` / `→` | Seek 5 seconds |
+| `N` | Next song |
+| `P` | Previous song |
+| `M` | Mute |
+| `F` | Fullscreen |
+| `/` | Focus search |
+
+## Development
+
+```bash
+npm install    # dev tools only (ESLint)
+npm test       # node:test suite
+npm run lint   # ESLint
+```
+
+The app is plain ES modules and CSS with no build or transpile step:
+
+| Path | Contents |
+| --- | --- |
+| `index.html` | Markup and icon sprite |
+| `css/app.css` | Layout, theme and responsive rules |
+| `js/app.js` | UI state, library browsing, queue, persistence |
+| `js/player.js` | Audio/video playback, CD+G sync, visualizer |
+| `js/cdg.js` | CD+G decoder and renderer |
+| `js/library.js` | Filename parsing, file pairing, search |
+| `js/zip.js` | Minimal ZIP reader (stored + deflate) |
+| `js/audio-tags.js` | ReplayGain tag parsing |
+| `serve.js` | Static file server for development and local use |
+| `test/` | Unit tests for the parser, pairing, search and CD+G decoder |
+
+## Licence
+
+ISC. The CD+G decoder is adapted from [cdgraphics](https://github.com/bhj/cdgraphics)
+by Ben Hilburn (ISC).

@@ -1,6 +1,8 @@
 ## TBD
 
-- **(App)** Search no longer separates results by artist and song and now works for keywords spanning both (e.g. "beatles all together now")
+- Rewrote the app as a local, dependency-free karaoke player. The browser reads a music folder directly (File System Access API) and plays MP3+G, zipped MP3+G and MP4 files; the queue, favourites and display settings are remembered locally
+- Removed the React client, the Koa server, the webpack/babel/vitest toolchain and all runtime dependencies. `npm start` serves the static app with Node's standard library, and the tests now use `node:test`
+- Search matches keywords spanning both artist and title (e.g. "beatles all together now"), grouped by artist with alphabet jump and favourites
 
 ## v2.0.2 (2026-02-14)
 
