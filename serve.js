@@ -12,7 +12,7 @@ import { createServer } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { extname, join, normalize, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)))
 
@@ -30,9 +30,9 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json; charset=utf-8',
 }
 
-function parsePort (argv) {
+export function parsePort (argv, env = process.env) {
   const flag = argv.indexOf('--port')
-  const value = flag !== -1 ? argv[flag + 1] : process.env.PORT
+  const value = flag !== -1 ? argv[flag + 1] : env.PORT
   const port = Number(value ?? 3000)
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -42,13 +42,23 @@ function parsePort (argv) {
   return port
 }
 
-/** Resolve a request path to a file inside ROOT, or null when it escapes. */
-function resolvePath (urlPath) {
-  const decoded = decodeURIComponent(urlPath.split('?')[0])
+/**
+ * Resolve a request path to a file inside ROOT.
+ * Returns `{ status, path }`; status is 200 when a file was resolved.
+ */
+export function resolvePath (urlPath) {
+  let decoded
+  try {
+    decoded = decodeURIComponent(urlPath.split('?')[0])
+  } catch {
+    // Malformed percent-encoding (e.g. "%zz")
+    return { status: 400 }
+  }
+
   const target = normalize(join(ROOT, decoded === '/' ? 'index.html' : decoded))
 
-  if (target !== ROOT && !target.startsWith(ROOT + sep)) return null
-  return target
+  if (target !== ROOT && !target.startsWith(ROOT + sep)) return { status: 403 }
+  return { status: 200, path: target }
 }
 
 async function handleRequest (request, response) {
@@ -57,16 +67,16 @@ async function handleRequest (request, response) {
     return
   }
 
-  const filePath = resolvePath(request.url ?? '/')
+  const resolved = resolvePath(request.url ?? '/')
 
-  if (!filePath) {
-    response.writeHead(403).end('Forbidden')
+  if (resolved.status !== 200) {
+    response.writeHead(resolved.status).end(resolved.status === 400 ? 'Bad request' : 'Forbidden')
     return
   }
 
   let info
   try {
-    info = await stat(filePath)
+    info = await stat(resolved.path)
   } catch {
     response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('Not found')
     return
@@ -78,7 +88,7 @@ async function handleRequest (request, response) {
   }
 
   response.writeHead(200, {
-    'content-type': MIME_TYPES[extname(filePath).toLowerCase()] ?? 'application/octet-stream',
+    'content-type': MIME_TYPES[extname(resolved.path).toLowerCase()] ?? 'application/octet-stream',
     'content-length': info.size,
     // Local files change while editing; always revalidate.
     'cache-control': 'no-cache',
@@ -89,18 +99,28 @@ async function handleRequest (request, response) {
     return
   }
 
-  createReadStream(filePath).pipe(response)
+  createReadStream(resolved.path).pipe(response)
 }
 
-const port = parsePort(process.argv.slice(2))
+/** Request handler, exported so the server can be exercised by tests. */
+export function createHandler () {
+  return (request, response) => {
+    handleRequest(request, response).catch((error) => {
+      console.error(error)
+      if (!response.headersSent) response.writeHead(500)
+      response.end('Internal error')
+    })
+  }
+}
 
-createServer((request, response) => {
-  handleRequest(request, response).catch((error) => {
-    console.error(error)
-    if (!response.headersSent) response.writeHead(500)
-    response.end('Internal error')
+const isMain = process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href
+
+if (isMain) {
+  const port = parsePort(process.argv.slice(2))
+
+  createServer(createHandler()).listen(port, () => {
+    console.log(`Karaoke player running at http://localhost:${port}`)
+    console.log('Press Ctrl+C to stop.')
   })
-}).listen(port, () => {
-  console.log(`Karaoke player running at http://localhost:${port}`)
-  console.log('Press Ctrl+C to stop.')
-})
+}
