@@ -83,6 +83,19 @@ test('parseElrc infers lines when there is no LRC companion', () => {
   ])
 })
 
+test('parseElrc keeps word timing on single-word line headers', () => {
+  const result = parseElrc([
+    '[00:01.00]Oooooooooh',
+    '[00:01.00]Oooooooooh',
+    '[00:03.00]Next line',
+    '[00:03.00]Next',
+    '[00:03.40]line',
+  ].join('\n'))
+
+  assert.deepEqual(result.lines[0].words, [{ text: 'Oooooooooh', time: 1 }])
+  assert.deepEqual(result.lines[1].words.map(word => word.text), ['Next', 'line'])
+})
+
 test('parseLyrics falls back to standalone ELRC line headers', () => {
   const result = parseLyrics({
     lrcText: '[ar:Example Artist]\n',
@@ -108,7 +121,7 @@ test('ELRC word matching tolerates punctuation and curly apostrophes', () => {
     lrcText: '[00:01.00]Don’t stop, believing!',
     elrcText: [
       '[00:01.00]Don’t stop, believing!',
-      "[00:01.00]Don't",
+      '[00:01.00]Don\'t',
       '[00:01.60]stop',
       '[00:02.10]believing',
     ].join('\n'),
