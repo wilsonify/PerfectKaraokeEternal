@@ -42,7 +42,7 @@
       <img src="assets/app.png" alt="" width="32" height="32">
       <div>
         <strong>Perfect Karaoke</strong>
-        <span>local MP3+G &amp; video player</span>
+        <span>local MP3+G, LRC &amp; video player</span>
       </div>
     </div>
 
@@ -61,7 +61,7 @@
       </button>
       <input id="folder-input" type="file" webkitdirectory directory multiple hidden>
       <input id="files-input" type="file" multiple hidden
-        accept=".mp3,.m4a,.wav,.ogg,.flac,.cdg,.zip,.mp4,audio/*,video/mp4,application/zip">
+        accept=".mp3,.m4a,.wav,.ogg,.flac,.cdg,.lrc,.elrc,.zip,.mp4,audio/*,video/mp4,application/zip">
     </div>
 
     <p class="scan-status" id="scan-status" aria-live="polite">Choose a folder to begin.</p>
@@ -77,12 +77,18 @@
           <canvas id="cdg-canvas" aria-label="Karaoke lyrics"></canvas>
         </div>
 
+        <div class="lyrics-layer" id="lyrics-layer" hidden>
+          <div class="lyrics-scroll" id="lyrics-scroll">
+            <ol class="lyrics-lines" id="lyrics-lines" aria-label="Synchronized lyrics"></ol>
+          </div>
+        </div>
+
         <video id="video" playsinline hidden aria-label="Karaoke video"></video>
 
         <div class="stage-message" id="stage-message">
           <p class="message-kicker" id="message-kicker">Ready</p>
           <h1 id="message-title">Open your karaoke folder</h1>
-          <p id="message-text">MP3+G, zipped MP3+G, and MP4 files are supported. Everything stays on this computer.</p>
+          <p id="message-text">MP3+G, audio with LRC/ELRC lyrics, zipped songs, and MP4 files are supported. Everything stays on this computer.</p>
           <div class="message-actions">
             <button type="button" id="message-play" class="btn primary" hidden>
               <svg class="icon"><use href="#i-play"></use></svg>
