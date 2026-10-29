@@ -308,6 +308,67 @@ export default class KaraokePlayer {
     this.media.volume = 1
   }
 
+  async loadLrc (track, generation) {
+    let audioBlob
+    let audioBytesForTags
+    let lrcText = null
+    let elrcText = null
+
+    if (track.kind === 'zip-lrc') {
+      const { audioEntry, lrcEntry, elrcEntry } = track.zipEntries
+      const [audioBytes, lrcBytes, elrcBytes] = await Promise.all([
+        readZipEntry(track.file, audioEntry),
+        lrcEntry ? readZipEntry(track.file, lrcEntry) : null,
+        elrcEntry ? readZipEntry(track.file, elrcEntry) : null,
+      ])
+      if (generation !== this.generation) return
+
+      audioBlob = new Blob([audioBytes], { type: audioMimeType(audioEntry.name) })
+      audioBytesForTags = audioBytes.subarray(0, 1024 * 1024)
+      if (lrcBytes) lrcText = new TextDecoder().decode(lrcBytes)
+      if (elrcBytes) elrcText = new TextDecoder().decode(elrcBytes)
+    } else {
+      const [tagsBuffer, lrcSource, elrcSource] = await Promise.all([
+        track.file.slice(0, 1024 * 1024).arrayBuffer().catch(() => null),
+        track.lrcFile ? track.lrcFile.text() : null,
+        track.elrcFile ? track.elrcFile.text() : null,
+      ])
+      if (generation !== this.generation) return
+
+      audioBlob = track.file
+      audioBytesForTags = tagsBuffer ? new Uint8Array(tagsBuffer) : null
+      lrcText = lrcSource
+      elrcText = elrcSource
+    }
+
+    const lyrics = parseLyrics({ lrcText, elrcText })
+    if (lyrics.lines.length === 0) {
+      throw new Error(`${track.sourceName}: no usable lyric lines in the .lrc or .elrc file`)
+    }
+
+    if (audioBytesForTags) {
+      try {
+        this.replayGain = parseReplayGain(audioBytesForTags)
+      } catch {
+        this.replayGain = null
+      }
+    }
+
+    this.lyrics = lyrics
+    this.mode = 'lrc'
+    this.media = this.els.audio
+    this.connectMediaElement(this.media)
+
+    const url = URL.createObjectURL(audioBlob)
+    this.urls.push(url)
+    this.media.src = url
+    this.media.type = audioBlob.type
+
+    await this.waitForMetadata(this.media, track)
+    if (generation !== this.generation) return
+    this.media.volume = 1
+  }
+
   async loadVideo (track, generation) {
     this.mode = 'mp4'
     this.media = this.els.video
