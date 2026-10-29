@@ -61,9 +61,9 @@ function moveArticles (str, articles) {
   for (const article of articles) {
     const search = `${article} `
     if (new RegExp(`^${search}`, 'i').test(str)) {
-      const parens = /[([{].*$/.exec(str)
-      if (parens) {
-        return `${str.substring(search.length, parens.index).trim()}, ${article} ${parens[0]}`.trim()
+      const parensIndex = str.search(/[([{]/)
+      if (parensIndex !== -1) {
+        return `${str.substring(search.length, parensIndex).trim()}, ${article} ${str.slice(parensIndex)}`.trim()
       }
       return `${str.substring(search.length)}, ${article}`.trim()
     }
@@ -467,7 +467,9 @@ export async function collectDirectoryRecords (directory, { onEntry } = {}) {
       entries = []
       for await (const entry of dir.values()) entries.push(entry)
     } catch (error) {
-      const path = prefix.replace(/\/+$/, '') || '.'
+      let path = prefix
+      while (path.endsWith('/')) path = path.slice(0, -1)
+      path = path || '.'
       warnings.push({ path, reason: `could not read folder (${error.message || 'unknown error'})` })
       return
     }
