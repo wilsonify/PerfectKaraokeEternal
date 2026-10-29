@@ -431,6 +431,7 @@ export default class KaraokePlayer {
     this.mode = null
     this.decoder = null
     this.lastFrame = null
+    this.lyrics = null
     this.duration = 0
     this.replayGain = null
     this.isPlaying = false
@@ -441,6 +442,7 @@ export default class KaraokePlayer {
     ctx?.clearRect(0, 0, 300, 216)
     this.els.backdrop.hidden = true
     this.els.cdgLayer.hidden = true
+    this.els.lyricsLayer.hidden = true
     this.els.video.hidden = true
   }
 
@@ -560,6 +562,8 @@ export default class KaraokePlayer {
         }
 
         if (this.options.visualizer) this.drawVisualizer()
+      } else if (this.mode === 'lrc' && this.options.visualizer) {
+        this.drawVisualizer()
       }
     }
 
