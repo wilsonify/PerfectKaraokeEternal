@@ -574,7 +574,9 @@ function playNext () {
     return
   }
 
-  if (state.currentId) {
+  // Once a song has ended (or a previous Next already recorded it), the same
+  // play must not be appended to the history again.
+  if (state.currentId && !state.finished) {
     state.history.push(state.currentId)
     if (state.history.length > 200) state.history.shift()
   }
