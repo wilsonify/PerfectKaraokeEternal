@@ -359,6 +359,19 @@ test('buildLibrary pairs audio with LRC and optional ELRC in a folder', async ()
   assert.equal(tracks[0].size, 100 + lrcText.length + elrcText.length)
 })
 
+test('buildLibrary pairs LRC case-insensitively without an ELRC', async () => {
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('Case Artist - Case Song.MP3'), path: 'Case Artist - Case Song.MP3' },
+    { file: textFile('case artist - case song.LRC', lrcText), path: 'case artist - case song.LRC' },
+  ])
+
+  assert.equal(warnings.length, 0)
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].kind, 'lrc')
+  assert.equal(tracks[0].elrcFile, null)
+  assert.equal(tracks[0].lrcFile.name, 'case artist - case song.LRC')
+})
+
 test('buildLibrary supports ELRC-only lyrics with usable line headers', async () => {
   const { tracks, warnings } = await buildLibrary([
     { file: file('ELRC Artist - Header Song.mp3'), path: 'ELRC Artist - Header Song.mp3' },
