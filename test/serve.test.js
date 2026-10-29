@@ -106,7 +106,7 @@ test('GET / serves the app shell', async () => {
   const response = await rawRequest('/')
   assert.equal(response.status, 200)
   assert.match(response.headers['content-type'], /text\/html/)
-  assert.match(response.body, /<title>Perfect Karaoke<\/title>/)
+  assert.match(response.body, /<title>Perfect Karaoke Forever<\/title>/)
 })
 
 test('GET serves modules with the right content type', async () => {
