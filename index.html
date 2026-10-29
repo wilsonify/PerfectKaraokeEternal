@@ -59,8 +59,8 @@
         <svg class="icon"><use href="#i-plus"></use></svg>
         Add files
       </button>
-      <input id="folder-input" type="file" webkitdirectory directory multiple hidden>
-      <input id="files-input" type="file" multiple hidden
+      <input id="folder-input" type="file" webkitdirectory directory multiple hidden aria-label="Open music folder">
+      <input id="files-input" type="file" multiple hidden aria-label="Add files"
         accept=".mp3,.m4a,.wav,.ogg,.flac,.cdg,.lrc,.elrc,.zip,.mp4,audio/*,video/mp4,application/zip">
     </div>
 
@@ -70,7 +70,7 @@
   <main class="layout">
     <section class="stage-panel" id="stage-panel" aria-label="Karaoke player">
       <div class="stage" id="stage">
-        <canvas id="visualizer" class="visualizer" aria-hidden="true"></canvas>
+        <canvas id="visualizer" class="visualizer"></canvas>
 
         <div class="cdg-layer" id="cdg-layer" hidden>
           <div class="cdg-backdrop" id="cdg-backdrop" hidden></div>
@@ -169,6 +169,7 @@
         <div class="library-toolbar">
           <label class="search-box">
             <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <span class="visually-hidden">Search artist or song</span>
             <input id="search" type="search" placeholder="Search artist or song…" autocomplete="off" spellcheck="false">
           </label>
           <button type="button" id="favorites-toggle" class="btn" aria-pressed="false">
