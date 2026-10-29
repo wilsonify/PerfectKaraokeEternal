@@ -1,9 +1,11 @@
 # Perfect Karaoke
 
-A local karaoke player for MP3+G (CD+G), synchronized LRC/ELRC lyrics, and MP4
-files. Open a folder of songs in your browser, build a queue, and sing.
-Everything runs in the browser: there is no application backend, no accounts, no
-uploads, and no build step.
+A local karaoke player with support for MP3+G (CD+G), synchronized LRC/ELRC lyrics, and MP4
+files. 
+
+Open a folder of songs in your browser, build a queue, and sing.
+
+Everything runs in the browser: there is no application backend, no accounts, no uploads, and no build step.
 
 ![Perfect Karaoke player](assets/screenshot.png)
 
@@ -15,7 +17,7 @@ uploads, and no build step.
 - MP4 karaoke videos, with an audio-track selector when the browser exposes multiple MP4 tracks (currently Safari; Chromium-based browsers and Firefox play the default track)
 - CD+G and LRC lyrics rendering with adjustable size and background dimming
 - Current-line highlighting, ELRC word timing, automatic scrolling and click-to-seek for LRC lyrics
-- Optional audio-reactive visualizer behind the lyrics
+- Selectable audio-reactive background visuals behind the lyrics, remembered between visits (Classic, Hot Pink, Spectrum, Waveform, Aurora, Pulse, Starfield, Minimal, or Off)
 - Library grouped by artist with alphabet jump, favourites and search
 - Queue with drag-and-drop reordering, history and "play now"
 - Optional ReplayGain volume leveling
@@ -138,7 +140,8 @@ The app is plain ES modules and CSS with no build or transpile step:
 | `index.html` | Markup and icon sprite |
 | `css/app.css` | Layout, theme and responsive rules |
 | `js/app.js` | UI state, library browsing, queue, persistence |
-| `js/player.js` | Audio/video playback, CD+G sync, LRC/ELRC loading, visualizer |
+| `js/player.js` | Audio/video playback, CD+G sync, LRC/ELRC loading, visualizer dispatch |
+| `js/visualizer.js` | Background visual styles, audio sampling and selection persistence |
 | `js/cdg.js` | CD+G decoder and renderer |
 | `js/lrc.js` | LRC/ELRC parsing and word-timing alignment |
 | `js/library.js` | Filename parsing, file pairing, resilient scanning, search |
