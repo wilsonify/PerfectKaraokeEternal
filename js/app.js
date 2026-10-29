@@ -10,6 +10,12 @@ import {
 } from './library.js'
 import { describeAudioTrack } from './audio-tracks.js'
 import KaraokePlayer from './player.js'
+import {
+  DEFAULT_VISUAL_STYLE,
+  normalizeVisualStyle,
+  resolveSavedVisualStyle,
+  VISUAL_STYLES,
+} from './visualizer.js'
 
 const PREFS_KEY = 'pke.prefs.v1'
 const SESSION_KEY = 'pke.session.v1'
@@ -21,7 +27,7 @@ const DEFAULT_PREFS = {
   replayGain: false,
   cdgAlpha: 0.5,
   cdgSize: 0.65,
-  visualizer: true,
+  visualStyle: DEFAULT_VISUAL_STYLE,
   sensitivity: 1,
   favorites: [],
   audioTracks: {},
@@ -71,9 +77,11 @@ function writeJson (key, value) {
 }
 
 const savedPrefs = readJson(PREFS_KEY) ?? {}
+const { visualizer: legacyVisualizer, ...savedPrefsWithoutLegacy } = savedPrefs
 const prefs = {
   ...DEFAULT_PREFS,
-  ...savedPrefs,
+  ...savedPrefsWithoutLegacy,
+  visualStyle: resolveSavedVisualStyle(savedPrefs.visualStyle, legacyVisualizer),
   favorites: Array.isArray(savedPrefs.favorites) ? savedPrefs.favorites : [],
   audioTracks: savedPrefs.audioTracks && typeof savedPrefs.audioTracks === 'object'
     ? savedPrefs.audioTracks
@@ -179,7 +187,7 @@ const els = {
   cdgSizeValue: $('cdg-size-value'),
   cdgAlpha: $('cdg-alpha'),
   cdgAlphaValue: $('cdg-alpha-value'),
-  visualizerEnabled: $('visualizer-enabled'),
+  visualStyle: $('visual-style'),
   sensitivity: $('sensitivity'),
   sensitivityValue: $('sensitivity-value'),
   replayGain: $('replaygain-enabled'),
@@ -304,7 +312,8 @@ function initPlayer () {
   player.setOptions({
     cdgAlpha: prefs.cdgAlpha,
     cdgSize: prefs.cdgSize,
-    visualizer: prefs.visualizer,
+    visualizer: prefs.visualStyle !== 'off',
+    visualStyle: prefs.visualStyle,
     sensitivity: prefs.sensitivity,
   })
   updateLyricsStyle()
@@ -1520,12 +1529,18 @@ function setTab (tab) {
   if (isLibrary) els.libraryList.focus({ preventScroll: true })
 }
 
+function populateVisualStyles () {
+  for (const style of VISUAL_STYLES) {
+    els.visualStyle.add(new Option(style.label, style.id))
+  }
+}
+
 function updateOptionsUI () {
   els.cdgSize.value = String(prefs.cdgSize)
   els.cdgSizeValue.textContent = `${Math.round(prefs.cdgSize * 100)}%`
   els.cdgAlpha.value = String(prefs.cdgAlpha)
   els.cdgAlphaValue.textContent = `${Math.round(prefs.cdgAlpha * 100)}%`
-  els.visualizerEnabled.checked = prefs.visualizer
+  els.visualStyle.value = prefs.visualStyle
   els.sensitivity.value = String(prefs.sensitivity)
   els.sensitivityValue.textContent = `${Math.round(prefs.sensitivity * 100)}%`
   els.replayGain.checked = prefs.replayGain
@@ -1535,7 +1550,8 @@ function applyOptions () {
   player.setOptions({
     cdgAlpha: prefs.cdgAlpha,
     cdgSize: prefs.cdgSize,
-    visualizer: prefs.visualizer,
+    visualizer: prefs.visualStyle !== 'off',
+    visualStyle: prefs.visualStyle,
     sensitivity: prefs.sensitivity,
   })
   updateLyricsStyle()
@@ -1547,7 +1563,7 @@ function applyOptions () {
 function resetOptions () {
   prefs.cdgAlpha = DEFAULT_PREFS.cdgAlpha
   prefs.cdgSize = DEFAULT_PREFS.cdgSize
-  prefs.visualizer = DEFAULT_PREFS.visualizer
+  prefs.visualStyle = DEFAULT_PREFS.visualStyle
   prefs.sensitivity = DEFAULT_PREFS.sensitivity
   prefs.replayGain = DEFAULT_PREFS.replayGain
   applyOptions()
@@ -1731,8 +1747,8 @@ function bindEvents () {
     prefs.sensitivity = Number(els.sensitivity.value)
     applyOptions()
   })
-  els.visualizerEnabled.addEventListener('change', () => {
-    prefs.visualizer = els.visualizerEnabled.checked
+  els.visualStyle.addEventListener('change', () => {
+    prefs.visualStyle = normalizeVisualStyle(els.visualStyle.value)
     applyOptions()
   })
   els.replayGain.addEventListener('change', () => {
@@ -1818,6 +1834,7 @@ function bindEvents () {
 async function init () {
   loadSession()
   els.volume.value = String(prefs.volume)
+  populateVisualStyles()
   updateOptionsUI()
   initPlayer()
   bindEvents()
