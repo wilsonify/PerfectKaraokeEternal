@@ -151,6 +151,10 @@ export function parseTrackName (name, cfg = {}) {
   artist = moveArticles(artist, articles)
   title = moveArticles(title, articles)
 
+  // A name such as "Artist - [Karaoke]" loses its whole title when the
+  // karaoke suffix is stripped. Reject it instead of showing a blank row.
+  if (!artist || !title) throw new Error('empty artist or title in filename')
+
   return {
     artist,
     artistNorm: normalizeString(artist, articles),
@@ -237,7 +241,10 @@ async function findZipTracks (entries, archiveName, archiveFile) {
   const usable = entries.filter(entry =>
     !entry.isDirectory
     && !entry.name.startsWith('__MACOSX/')
-    && !entry.name.endsWith('.DS_Store'),
+    && !entry.name.endsWith('.DS_Store')
+    // macOS also stores AppleDouble resource forks beside the real files;
+    // they share the audio extension but are not playable media.
+    && !fileName(entry.name).startsWith('._'),
   )
   const audio = usable.filter(entry => CDG_AUDIO_EXTENSIONS.includes(getExtension(entry.name)))
   const cdg = usable.filter(entry => getExtension(entry.name) === '.cdg')
