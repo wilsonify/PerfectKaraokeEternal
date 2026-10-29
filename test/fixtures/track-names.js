@@ -306,4 +306,15 @@ export const trackNameCases = [
       titleNorm: '花火',
     },
   },
+  // Regression test for upstream issue #53 (RTL/Hebrew filenames parse fine
+  // as long as they use the "Artist - Title" delimiter).
+  {
+    input: 'שלמה ארצי - שיר ללא שם',
+    output: {
+      artist: 'שלמה ארצי',
+      artistNorm: 'שלמה ארצי',
+      title: 'שיר ללא שם',
+      titleNorm: 'שיר ללא שם',
+    },
+  },
 ]
