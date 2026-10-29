@@ -475,7 +475,7 @@ export default class KaraokePlayer {
 
   toggle () {
     if (!this.media?.src) return
-    if (this.media.paused) this.play()
+    if (this.media.paused) this.play().catch(error => this.fail(error.message))
     else this.pause()
   }
 
