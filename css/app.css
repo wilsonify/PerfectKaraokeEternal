@@ -302,6 +302,89 @@ summary:focus-visible,
   pointer-events: none;
 }
 
+/* ---------- Synchronized LRC lyrics ---------- */
+.lyrics-layer {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  padding: clamp(58px, 8vh, 92px) clamp(18px, 7vw, 110px) clamp(42px, 6vh, 72px);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(5, 9, 20, 0.22), transparent 24%, transparent 74%, rgba(5, 9, 20, 0.3));
+}
+
+.lyrics-scroll {
+  width: min(920px, 100%);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  mask-image: linear-gradient(180deg, transparent, #000 9%, #000 88%, transparent);
+}
+
+.lyrics-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.lyrics-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.24rem;
+  margin: 0;
+  padding: 38% 0 48%;
+  list-style: none;
+}
+
+.lyric-line {
+  max-width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 0.34rem 0.85rem;
+  background: transparent;
+  color: rgba(230, 237, 247, 0.3);
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, calc(2.7vw * var(--lyrics-scale, 1)), 2.5rem);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.lyric-line:hover,
+.lyric-line:focus-visible {
+  color: rgba(230, 237, 247, 0.62);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.lyric-line.is-past {
+  color: rgba(230, 237, 247, 0.23);
+}
+
+.lyric-line.is-active {
+  color: #fff;
+  background: rgba(5, 9, 20, var(--lyrics-alpha, 0.5));
+  box-shadow: 0 0 0 1px rgba(255, 62, 165, 0.18), 0 18px 50px rgba(0, 0, 0, 0.24);
+  transform: scale(1.025);
+}
+
+.lyric-word {
+  color: inherit;
+  transition: color 0.12s linear;
+}
+
+.lyric-line.is-active .lyric-word {
+  color: rgba(230, 237, 247, 0.42);
+}
+
+.lyric-line.is-active .lyric-word.is-sung {
+  color: #fff;
+}
+
 #video {
   position: absolute;
   inset: 0;
@@ -1383,6 +1466,19 @@ kbd {
 
   .stage-message h1 {
     font-size: 1.4rem;
+  }
+
+  .lyrics-layer {
+    padding: 52px 12px 38px;
+  }
+
+  .lyrics-lines {
+    padding-top: 42%;
+    padding-bottom: 52%;
+  }
+
+  .lyric-line {
+    padding: 0.28rem 0.6rem;
   }
 
   .tabs button {
