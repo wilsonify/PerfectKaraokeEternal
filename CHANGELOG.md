@@ -3,6 +3,11 @@
 - Rewrote the app as a local, dependency-free karaoke player. The browser reads a music folder directly (File System Access API) and plays MP3+G, zipped MP3+G and MP4 files; the queue, favourites and display settings are remembered locally
 - Removed the React client, the Koa server, the webpack/babel/vitest toolchain and all runtime dependencies. `npm start` serves the static app with Node's standard library, and the tests now use `node:test`
 - Search matches keywords spanning both artist and title (e.g. "beatles all together now"), grouped by artist with alphabet jump and favourites
+- Fixed CD+G backgrounds painting over the visualizer after the first frame; the stage now shows through on every frame, as it did before the rewrite
+- Zipped albums now use folder names as an artist fallback and report corrupt archives without aborting the scan
+- "Play now" removes one matching entry from the upcoming queue so it cannot play twice; duplicate queue entries remain allowed, matching upstream, with a toast confirming each add
+- Multi-track MP4 selectors handle tracks without ids, and the Safari-only browser limitation is documented
+- Added regression tests for CD+G keying, deflated and multi-song ZIPs, resilient scanning, audio tracks and the static server
 
 ## v2.0.2 (2026-02-14)
 
