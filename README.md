@@ -1,17 +1,20 @@
 # Perfect Karaoke
 
-A local karaoke player for MP3+G (CD+G) and MP4 files. Open a folder of songs in
-your browser, build a queue, and sing. Everything runs in the browser: there is no
-application backend, no accounts, no uploads, and no build step.
+A local karaoke player for MP3+G (CD+G), synchronized LRC/ELRC lyrics, and MP4
+files. Open a folder of songs in your browser, build a queue, and sing.
+Everything runs in the browser: there is no application backend, no accounts, no
+uploads, and no build step.
 
 ![Perfect Karaoke player](assets/screenshot.png)
 
 ## Features
 
 - MP3+G tracks (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac` with a matching `.cdg`)
-- Zipped MP3+G archives, including archives with several songs or extra files
+- Audio with synchronized `.lrc` lyrics and optional `.elrc` word timing
+- Zipped MP3+G or LRC songs, including archives with several songs or extra files
 - MP4 karaoke videos, with an audio-track selector when the browser exposes multiple MP4 tracks (currently Safari; Chromium-based browsers and Firefox play the default track)
-- CD+G lyrics rendering with adjustable size and background dimming
+- CD+G and LRC lyrics rendering with adjustable size and background dimming
+- Current-line highlighting, ELRC word timing, automatic scrolling and click-to-seek for LRC lyrics
 - Optional audio-reactive visualizer behind the lyrics
 - Library grouped by artist with alphabet jump, favourites and search
 - Queue with drag-and-drop reordering, history and "play now"
@@ -48,19 +51,35 @@ load ES modules over `file://`.
 
 ## Song files
 
-Name audio and lyrics files the same way in the same folder:
+Name audio and lyric files the same way in the same folder. Audio can use a
+CD+G file, an LRC file, or both:
 
 ```text
 Queen - Bohemian Rhapsody.mp3
 Queen - Bohemian Rhapsody.cdg
+
+Olivia Rodrigo - Drivers License.mp3
+Olivia Rodrigo - Drivers License.lrc
+Olivia Rodrigo - Drivers License.elrc   # optional word timing
 ```
 
-Zipped tracks work too, as long as the audio and `.cdg` inside share a name:
+When both `.cdg` and `.lrc` are present, the CD+G version is used so its visual
+format is preserved. An `.elrc` file can be used on its own when its line headers
+provide the lyric text. Standalone `.lrc` and `.elrc` files are not playable
+tracks.
+
+Zipped tracks work too, as long as the audio and its companion files share a
+name:
 
 ```text
 Queen - BoRhap.zip
   Queen - BoRhap.mp3
   Queen - BoRhap.cdg
+
+Olivia Rodrigo - Drivers License.zip
+  Olivia Rodrigo - Drivers License.mp3
+  Olivia Rodrigo - Drivers License.lrc
+  Olivia Rodrigo - Drivers License.elrc
 ```
 
 The filename parser understands the naming conventions karaoke libraries tend to
@@ -68,9 +87,10 @@ use: `The`-article handling (`Beatles, The`), track numbers (`AZ1234-01 - ...`),
 `ft.`/`feat.` variants, `[Karaoke]`-style suffixes, and `in the style of ...` titles.
 
 Files that cannot be used are not silently dropped: anything without a matching
-`.cdg`, or without an `Artist - Title` separator in the name, is counted in the
-"files skipped during the scan" notice above the library. Unreadable files and
-corrupt archives are reported there too, and the rest of the scan continues.
+`.cdg`, `.lrc`, or `.elrc`, or without an `Artist - Title` separator in the name,
+is counted in the "files skipped during the scan" notice above the library.
+Unreadable files and corrupt archives are reported there too, and the rest of
+the scan continues.
 
 MP4 files with multiple audio tracks (for example vocal and instrumental) show
 an audio-track selector in browsers that expose
@@ -105,14 +125,15 @@ The app is plain ES modules and CSS with no build or transpile step:
 | `index.html` | Markup and icon sprite |
 | `css/app.css` | Layout, theme and responsive rules |
 | `js/app.js` | UI state, library browsing, queue, persistence |
-| `js/player.js` | Audio/video playback, CD+G sync, visualizer |
+| `js/player.js` | Audio/video playback, CD+G sync, LRC/ELRC loading, visualizer |
 | `js/cdg.js` | CD+G decoder and renderer |
+| `js/lrc.js` | LRC/ELRC parsing and word-timing alignment |
 | `js/library.js` | Filename parsing, file pairing, resilient scanning, search |
 | `js/zip.js` | Minimal ZIP reader (stored + deflate) |
 | `js/audio-tags.js` | ReplayGain tag parsing |
 | `js/audio-tracks.js` | Multi-track MP4 audio switching (browser permitting) |
 | `serve.js` | Static file server for development and local use |
-| `test/` | Unit tests for parsing, pairing, ZIP reading, scanning, CD+G, ReplayGain, audio tracks and the server |
+| `test/` | Unit tests for parsing, pairing, ZIP reading, scanning, CD+G, LRC/ELRC, ReplayGain, audio tracks and the server, plus short real MP3+G excerpts in `test/fixtures/media/` |
 
 See [docs/UPSTREAM_ISSUE_ROADMAP.md](docs/UPSTREAM_ISSUE_ROADMAP.md) for the
 complete audit of upstream KaraokeEternal issues and the remaining work.
