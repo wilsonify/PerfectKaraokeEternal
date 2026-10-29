@@ -562,6 +562,24 @@ summary:focus-visible,
   width: 90px;
 }
 
+.audio-track {
+  max-width: 150px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  background: rgba(148, 163, 184, 0.12);
+  cursor: pointer;
+}
+
+.audio-track:hover,
+.audio-track:focus-visible {
+  border-color: var(--pink);
+}
+
 /* ---------- Browser panel ---------- */
 .browser-panel {
   display: flex;
