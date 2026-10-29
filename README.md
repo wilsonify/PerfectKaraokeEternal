@@ -46,6 +46,19 @@ node serve.js --port 8080
 PORT=8080 npm start
 ```
 
+The server listens on `127.0.0.1` only and serves just the player's own files
+(`index.html`, `css/`, `js/` and `assets/`), so the rest of the repository is not
+reachable. To open the player from another device on the same network, opt in
+explicitly:
+
+```bash
+node serve.js --host 0.0.0.0
+# or
+HOST=0.0.0.0 npm start
+```
+
+There is no authentication, so only do that on a network you trust.
+
 Opening `index.html` straight from disk does not work, because browsers refuse to
 load ES modules over `file://`.
 
