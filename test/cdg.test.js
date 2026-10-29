@@ -100,6 +100,35 @@ function buildKeyedBackgroundCdg () {
   return bytes.buffer
 }
 
+/**
+ * A stream whose lyric area grows over time: one short line, then a second
+ * line below it, then a wide line above both. This mirrors the frame-by-frame
+ * bounds the player uses to position the CD+G backdrop (issue #55).
+ */
+function buildGrowingCdg () {
+  const packets = [
+    packet(1, [0]), // memory preset: colour 0
+    packet(28, [0]), // colour 0 is the transparent key
+    clutLow([
+      [0, 0, 0], [15, 15, 15], [15, 0, 0], [0, 15, 15],
+      [0, 0, 15], [15, 15, 0], [15, 0, 15], [0, 15, 0],
+    ]),
+  ]
+
+  for (let column = 10; column < 15; column++) packets.push(tile(8, column, 1, 1))
+  padTo(packets, 300)
+
+  for (let column = 5; column < 25; column++) packets.push(tile(14, column, 1, 1))
+  padTo(packets, 600)
+
+  for (let column = 2; column < 31; column++) packets.push(tile(4, column, 1, 1))
+  padTo(packets, 900)
+
+  const bytes = new Uint8Array(packets.length * 24)
+  packets.forEach((part, index) => bytes.set(part, index * 24))
+  return bytes.buffer
+}
+
 function opaqueCount (imageData) {
   let count = 0
   for (let i = 3; i < imageData.data.length; i += 4) {
@@ -157,6 +186,18 @@ test('CDGDecoder applies later packets and border presets', () => {
   assert.ok(opaqueCount(frame.imageData) > 7200)
   // Border colour 3 is (0, 15, 15) * 17.
   assert.deepEqual(pixelAt(frame.imageData, 10, 10), [0, 255, 255, 255])
+})
+
+test('CD+G content bounds grow and reset with new lyric graphics (issue #55)', () => {
+  const decoder = new CDGDecoder(buildGrowingCdg())
+
+  assert.deepEqual(decoder.render(0.5, { forceKey: true }).contentBounds, [60, 96, 90, 108])
+  assert.deepEqual(decoder.render(1.5, { forceKey: true }).contentBounds, [30, 96, 150, 180])
+  assert.deepEqual(decoder.render(2.5, { forceKey: true }).contentBounds, [12, 48, 186, 180])
+
+  // Seeking back must shrink the bounds again, so the backdrop cannot stay
+  // stuck at the bounds of a larger, later frame (the #55 symptom).
+  assert.deepEqual(decoder.render(0.5, { forceKey: true }).contentBounds, [60, 96, 90, 108])
 })
 
 test('CDGDecoder restarts cleanly when seeking backwards', () => {
