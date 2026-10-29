@@ -2,7 +2,7 @@
   "name": "perfect-karaoke",
   "version": "0.0.0-dev.0",
   "private": true,
-  "description": "Local karaoke player for MP3+G and MP4 files",
+  "description": "karaoke player",
   "type": "module",
   "engines": {
     "node": ">=20"
