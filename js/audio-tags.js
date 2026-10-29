@@ -47,7 +47,9 @@ function parseTxxx (bytes) {
   if (bytes.length < 2) return null
   const encoding = bytes[0]
   const description = readTerminated(bytes, encoding, 1)
-  const value = decodeText(bytes.subarray(description.next), encoding).replace(/\0+$/, '').trim()
+  let value = decodeText(bytes.subarray(description.next), encoding)
+  while (value.endsWith('\0')) value = value.slice(0, -1)
+  value = value.trim()
   return { description: description.text.trim(), value }
 }
 
