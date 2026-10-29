@@ -79,6 +79,27 @@ function buildCdg () {
 
 const buffer = buildCdg()
 
+/**
+ * A stream whose background colour (0) is not the transparent key (1). The
+ * player always asks for the background to be keyed, otherwise the opaque CDG
+ * canvas would cover the visualizer behind it.
+ */
+function buildKeyedBackgroundCdg () {
+  const packets = [
+    packet(1, [0]), // memory preset: background colour 0
+    packet(28, [1]), // colour 1 is transparent; colour 0 is not
+    clutLow([
+      [15, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+      [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+    ]),
+  ]
+  padTo(packets, 300)
+
+  const bytes = new Uint8Array(packets.length * 24)
+  packets.forEach((part, index) => bytes.set(part, index * 24))
+  return bytes.buffer
+}
+
 function opaqueCount (imageData) {
   let count = 0
   for (let i = 3; i < imageData.data.length; i += 4) {
@@ -104,6 +125,21 @@ test('CDGDecoder renders the frame at a given time', () => {
   assert.equal(opaqueCount(frame.imageData), 7200)
   assert.deepEqual(pixelAt(frame.imageData, 10, 100), [255, 255, 255, 255])
   assert.deepEqual(frame.contentBounds, [0, 96, 300, 120])
+})
+
+test('CDGDecoder keys out the background for the visualizer when requested', () => {
+  const background = buildKeyedBackgroundCdg()
+  const normal = new CDGDecoder(background).render(0.5)
+  const keyed = new CDGDecoder(background).render(0.5, { forceKey: true })
+
+  // Without keying, the background stays opaque and would hide the visualizer.
+  assert.deepEqual(pixelAt(normal.imageData, 10, 100), [255, 0, 0, 255])
+  assert.deepEqual(normal.contentBounds, [0, 0, 300, 216])
+
+  // Keying makes it transparent while preserving the colour for the backdrop.
+  assert.deepEqual(pixelAt(keyed.imageData, 10, 100), [255, 0, 0, 0])
+  assert.deepEqual(keyed.contentBounds, [0, 0, 0, 0])
+  assert.deepEqual(keyed.backgroundRGBA, [255, 0, 0, 0])
 })
 
 test('CDGDecoder reports no change when time does not advance', () => {
