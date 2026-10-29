@@ -5,6 +5,22 @@ import { parseLyrics } from './lrc.js'
 import { audioMimeType } from './library.js'
 import { readZipEntry } from './zip.js'
 
+/**
+ * Cool, low-alpha colours for the stage visualizer. The spectrum sits behind
+ * the lyrics, so it must stay dark and desaturated rather than becoming a
+ * bright background of its own.
+ */
+export const VISUALIZER_COLORS = Object.freeze({
+  barGradient: [
+    'rgba(124, 154, 189, 0.38)',
+    'rgba(84, 112, 148, 0.32)',
+    'rgba(61, 84, 116, 0.38)',
+  ],
+  glow: [86, 120, 160],
+  glowAlpha: 0.08,
+  reflectionAlpha: 0.18,
+})
+
 const ERROR_MESSAGES = {
   1: 'Playback was aborted',
   2: 'A network error occurred while loading the media',
@@ -640,10 +656,11 @@ export default class KaraokePlayer {
     const baseline = height * 0.42
     const maxHeight = height * 0.5
 
+    const [topColor, midColor, baseColor] = VISUALIZER_COLORS.barGradient
     const gradient = ctx.createLinearGradient(0, baseline - maxHeight, 0, baseline)
-    gradient.addColorStop(0, 'rgba(76, 201, 240, 0.85)')
-    gradient.addColorStop(0.55, 'rgba(123, 44, 191, 0.8)')
-    gradient.addColorStop(1, 'rgba(255, 62, 165, 0.9)')
+    gradient.addColorStop(0, topColor)
+    gradient.addColorStop(0.55, midColor)
+    gradient.addColorStop(1, baseColor)
     ctx.fillStyle = gradient
 
     for (let i = 0; i < bars; i++) {
@@ -653,7 +670,7 @@ export default class KaraokePlayer {
       const x = i * (barWidth + gap)
       ctx.fillRect(x, baseline - barHeight / 2, barWidth, barHeight)
 
-      ctx.globalAlpha = 0.2
+      ctx.globalAlpha = VISUALIZER_COLORS.reflectionAlpha
       ctx.fillRect(x, baseline + barHeight / 2, barWidth, barHeight * 0.35)
       ctx.globalAlpha = 1
     }
@@ -666,7 +683,7 @@ export default class KaraokePlayer {
       width / 2, height * 0.75, 0,
       width / 2, height * 0.75, width * 0.55,
     )
-    radial.addColorStop(0, `rgba(255, 62, 165, ${0.16 * glow})`)
+    radial.addColorStop(0, `rgba(${VISUALIZER_COLORS.glow.join(', ')}, ${VISUALIZER_COLORS.glowAlpha * glow})`)
     radial.addColorStop(1, 'rgba(0, 0, 0, 0)')
     ctx.fillStyle = radial
     ctx.fillRect(0, 0, width, height)
