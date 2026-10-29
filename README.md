@@ -2,7 +2,7 @@
 
 A local karaoke player for MP3+G (CD+G) and MP4 files. Open a folder of songs in
 your browser, build a queue, and sing. Everything runs in the browser: there is no
-server component, no accounts, no uploads, and no build step.
+application backend, no accounts, no uploads, and no build step.
 
 ![Perfect Karaoke player](assets/screenshot.png)
 
@@ -10,7 +10,7 @@ server component, no accounts, no uploads, and no build step.
 
 - MP3+G tracks (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac` with a matching `.cdg`)
 - Zipped MP3+G archives, including archives with several songs or extra files
-- MP4 karaoke videos
+- MP4 karaoke videos, with an audio-track selector when the browser exposes multiple MP4 tracks (currently Safari; Chromium-based browsers and Firefox play the default track)
 - CD+G lyrics rendering with adjustable size and background dimming
 - Optional audio-reactive visualizer behind the lyrics
 - Library grouped by artist with alphabet jump, favourites and search
@@ -69,7 +69,14 @@ use: `The`-article handling (`Beatles, The`), track numbers (`AZ1234-01 - ...`),
 
 Files that cannot be used are not silently dropped: anything without a matching
 `.cdg`, or without an `Artist - Title` separator in the name, is counted in the
-"files skipped during the scan" notice above the library.
+"files skipped during the scan" notice above the library. Unreadable files and
+corrupt archives are reported there too, and the rest of the scan continues.
+
+MP4 files with multiple audio tracks (for example vocal and instrumental) show
+an audio-track selector in browsers that expose
+`HTMLMediaElement.audioTracks`. Safari supports this API; Chromium-based
+browsers and Firefox currently ship it disabled, so they play the file's
+default track.
 
 ## Keyboard shortcuts
 
@@ -100,11 +107,15 @@ The app is plain ES modules and CSS with no build or transpile step:
 | `js/app.js` | UI state, library browsing, queue, persistence |
 | `js/player.js` | Audio/video playback, CD+G sync, visualizer |
 | `js/cdg.js` | CD+G decoder and renderer |
-| `js/library.js` | Filename parsing, file pairing, search |
+| `js/library.js` | Filename parsing, file pairing, resilient scanning, search |
 | `js/zip.js` | Minimal ZIP reader (stored + deflate) |
 | `js/audio-tags.js` | ReplayGain tag parsing |
+| `js/audio-tracks.js` | Multi-track MP4 audio switching (browser permitting) |
 | `serve.js` | Static file server for development and local use |
-| `test/` | Unit tests for the parser, pairing, search and CD+G decoder |
+| `test/` | Unit tests for parsing, pairing, ZIP reading, scanning, CD+G, ReplayGain, audio tracks and the server |
+
+See [docs/UPSTREAM_ISSUE_ROADMAP.md](docs/UPSTREAM_ISSUE_ROADMAP.md) for the
+complete audit of upstream KaraokeEternal issues and the remaining work.
 
 ## Licence
 
