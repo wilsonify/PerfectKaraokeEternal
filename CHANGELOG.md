@@ -9,6 +9,8 @@
 - Added synchronized LRC/ELRC lyrics: line highlighting, ELRC word timing, automatic scrolling and click-to-seek. LRC/ELRC companions are paired in folders and ZIPs, ELRC can supply its own line headers, and CD+G still takes precedence when both are present
 - Multi-track MP4 selectors handle tracks without ids, and the Safari-only browser limitation is documented
 - Added regression tests for LRC/ELRC parsing and pairing, CD+G keying, deflated and multi-song ZIPs, resilient scanning, audio tracks and the static server
+- The static server now serves only `index.html`, `css/`, `js/` and `assets/`, so tests, docs, `.git` and `node_modules` are no longer reachable. It listens on loopback by default; `--host`/`HOST` is an explicit opt-in for LAN access
+- Zipped libraries ignore macOS AppleDouble (`._*`) entries instead of listing them as unplayable songs, and filenames that parse to an empty artist or title (for example `Artist - [Karaoke]`) are reported as skipped instead of added as blank rows
 
 ## v2.0.2 (2026-02-14)
 
