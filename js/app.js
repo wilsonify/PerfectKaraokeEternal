@@ -1,5 +1,6 @@
 import {
   buildLibrary,
+  collectDirectoryRecords,
   formatDuration,
   formatSize,
   getExtension,
@@ -7,12 +8,14 @@ import {
   searchTracks,
   SUPPORTED_EXTENSIONS,
 } from './library.js'
+import { describeAudioTrack } from './audio-tracks.js'
 import KaraokePlayer from './player.js'
 
 const PREFS_KEY = 'pke.prefs.v1'
 const SESSION_KEY = 'pke.session.v1'
 const DB_NAME = 'pke-files'
 const DB_STORE = 'handles'
+const AUDIO_TRACK_MEMORY = 50
 const DEFAULT_PREFS = {
   volume: 0.85,
   replayGain: false,
@@ -21,6 +24,7 @@ const DEFAULT_PREFS = {
   visualizer: true,
   sensitivity: 1,
   favorites: [],
+  audioTracks: {},
 }
 
 const $ = id => document.getElementById(id)
@@ -71,6 +75,9 @@ const prefs = {
   ...DEFAULT_PREFS,
   ...savedPrefs,
   favorites: Array.isArray(savedPrefs.favorites) ? savedPrefs.favorites : [],
+  audioTracks: savedPrefs.audioTracks && typeof savedPrefs.audioTracks === 'object'
+    ? savedPrefs.audioTracks
+    : {},
 }
 
 const state = {
@@ -132,6 +139,7 @@ const els = {
   duration: $('duration'),
   mute: $('mute'),
   volume: $('volume'),
+  audioTrack: $('audio-track'),
   fullscreen: $('fullscreen'),
   displayOptions: $('display-options'),
   scanStatus: $('scan-status'),
@@ -301,6 +309,7 @@ function handlePlayerEvent (event) {
       state.media.position = 0
       state.media.duration = 0
       state.media.isPlaying = false
+      els.audioTrack.hidden = true
       setStageMessage({
         kicker: 'Loading',
         title: event.track.title,
@@ -314,6 +323,7 @@ function handlePlayerEvent (event) {
       state.error = null
       els.message.hidden = true
       showNowPlaying(event.track)
+      updateAudioTrackUI(event.track)
       updateTransport()
       refreshSongStates()
       break
@@ -549,6 +559,8 @@ function queueTrack (id, { next = false } = {}) {
   const track = getTrack(id)
   if (!track) return
 
+  // Duplicate queue entries stay allowed: upstream deliberately supports
+  // queueing the same song more than once, and the toast confirms each add.
   if (next) state.queue.unshift(id)
   else state.queue.push(id)
 
@@ -569,13 +581,21 @@ function queueTrack (id, { next = false } = {}) {
   }
 }
 
-function playNow (id) {
+function playNow (id, { consumeQueue = true } = {}) {
   const track = getTrack(id)
   if (!track) return
 
   if (state.currentId && state.currentId !== id && !state.finished) {
     state.history.push(state.currentId)
     if (state.history.length > 200) state.history.shift()
+  }
+
+  // Playing an upcoming song now consumes one queue entry; otherwise it would
+  // play a second time when the queue reaches it. Queue rows remove their own
+  // exact entry first, so other duplicates are left untouched.
+  if (consumeQueue) {
+    const queuedIndex = state.queue.indexOf(id)
+    if (queuedIndex !== -1) state.queue.splice(queuedIndex, 1)
   }
 
   state.finished = false
@@ -589,7 +609,7 @@ function playNow (id) {
 function playQueueItem (index) {
   const [id] = state.queue.splice(index, 1)
   if (!id) return
-  playNow(id)
+  playNow(id, { consumeQueue: false })
 }
 
 function removeQueueItem (index) {
@@ -1224,29 +1244,15 @@ async function scanDirectoryHandle (handle) {
   setScanStatus(`Scanning “${handle.name}”…`)
   refreshInitialMessage()
 
-  const records = []
-
-  const walk = async (directory, prefix) => {
-    for await (const entry of directory.values()) {
-      if (entry.kind === 'file') {
-        if (!SUPPORTED_EXTENSIONS.includes(getExtension(entry.name))) continue
-        try {
-          records.push({ file: await entry.getFile(), path: `${prefix}${entry.name}` })
-        } catch {
-          state.warnings.push({ path: `${prefix}${entry.name}`, reason: 'could not read file' })
-        }
-        if (records.length % 40 === 0) {
-          setScanStatus(`Scanning “${handle.name}”… ${records.length} media files found`)
-        }
-      } else if (entry.kind === 'directory' && !entry.name.startsWith('.') && entry.name !== '__MACOSX') {
-        await walk(entry, `${prefix}${entry.name}/`)
-      }
-    }
-  }
-
   try {
-    await walk(handle, '')
-    await scanRecords(records, `“${handle.name}”`)
+    const { records, warnings } = await collectDirectoryRecords(handle, {
+      onEntry: ({ scanned }) => {
+        if (scanned % 40 === 0) {
+          setScanStatus(`Scanning “${handle.name}”… ${scanned} media files found`)
+        }
+      },
+    })
+    await scanRecords(records, `“${handle.name}”`, warnings)
   } catch (error) {
     setScanning(false)
     setScanStatus('Folder scan failed.')
@@ -1274,10 +1280,10 @@ async function scanFileList (fileList) {
   await scanRecords(records, 'selected files')
 }
 
-async function scanRecords (records, sourceLabel) {
+async function scanRecords (records, sourceLabel, scanWarnings = []) {
   setScanning(true)
   setScanStatus(`Scanning ${sourceLabel}…`)
-  state.warnings = []
+  state.warnings = [...scanWarnings]
   els.libraryList.replaceChildren()
   refreshInitialMessage()
 
@@ -1290,7 +1296,7 @@ async function scanRecords (records, sourceLabel) {
 
     state.tracks = result.tracks
     state.trackMap = new Map(result.tracks.map(track => [track.id, track]))
-    state.warnings = result.warnings
+    state.warnings = [...scanWarnings, ...result.warnings]
     state.visibleArtists = 60
     state.visibleResults = 200
 
@@ -1434,6 +1440,52 @@ function updateFullscreenButton () {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Audio tracks (multi-track MP4 files)                                       */
+/* -------------------------------------------------------------------------- */
+
+function rememberAudioTrack (trackId, audioTrackId) {
+  const memory = prefs.audioTracks
+  // Re-insert so Object.keys order reflects least-recently-used first.
+  delete memory[trackId]
+  memory[trackId] = audioTrackId
+
+  // Bound the memory so it cannot grow forever.
+  const keys = Object.keys(memory)
+  for (const key of keys.slice(0, Math.max(0, keys.length - AUDIO_TRACK_MEMORY))) {
+    delete memory[key]
+  }
+  savePrefs()
+}
+
+function updateAudioTrackUI (track) {
+  const select = els.audioTrack
+  const tracks = player.getAudioTracks()
+  select.replaceChildren()
+
+  if (tracks.length < 2) {
+    select.hidden = true
+    return
+  }
+
+  for (const info of tracks) {
+    const option = element('option', null, describeAudioTrack(info))
+    option.value = info.id
+    select.append(option)
+  }
+  select.hidden = false
+
+  const remembered = track ? prefs.audioTracks[track.id] : null
+  if (remembered !== null && remembered !== undefined
+    && player.selectAudioTrack(remembered)) {
+    select.value = remembered
+    return
+  }
+
+  const enabled = tracks.find(info => info.enabled) ?? tracks[0]
+  select.value = enabled.id
+}
+
+/* -------------------------------------------------------------------------- */
 /* Volume                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -1487,6 +1539,14 @@ function bindEvents () {
   els.volume.addEventListener('input', () => {
     state.lastVolume = Number(els.volume.value) || state.lastVolume
     setVolume(Number(els.volume.value))
+  })
+
+  els.audioTrack.addEventListener('change', () => {
+    if (!player.selectAudioTrack(els.audioTrack.value)) {
+      showToast('Could not switch audio track.')
+      return
+    }
+    if (state.currentId) rememberAudioTrack(state.currentId, els.audioTrack.value)
   })
 
   els.seek.addEventListener('input', () => {
