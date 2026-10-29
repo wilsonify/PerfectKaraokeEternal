@@ -996,7 +996,7 @@ function renderAlphaPicker (artists) {
   els.alphaPicker.hidden = false
   els.alphaPicker.replaceChildren()
 
-  for (const letter of [...letters].sort()) {
+  for (const letter of [...letters].sort((a, b) => a.localeCompare(b))) {
     const button = element('button', null, letter)
     button.type = 'button'
     button.setAttribute('aria-label', `Jump to artists starting with ${letter}`)
@@ -1368,7 +1368,7 @@ async function scanDirectoryHandle (handle) {
   }
 
   state.folderHandle = handle
-  saveFolderHandle(handle)
+  void saveFolderHandle(handle)
   els.reopenFolder.hidden = false
   els.reopenLabel.textContent = `Reopen “${handle.name}”`
 
@@ -1785,7 +1785,7 @@ function bindEvents () {
       case 'f':
       case 'F':
         event.preventDefault()
-        toggleFullscreen()
+        void toggleFullscreen()
         break
       case '/':
         event.preventDefault()
@@ -1844,4 +1844,6 @@ async function init () {
   }
 }
 
-init()
+init().catch((error) => {
+  showToast(`Could not start the player: ${error.message}`)
+})
