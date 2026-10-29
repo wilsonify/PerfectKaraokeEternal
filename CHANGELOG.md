@@ -1,5 +1,6 @@
 ## TBD
 
+- Added a Background visual selector: Classic keeps the existing dark spectrum, and Hot Pink, Spectrum, Waveform, Aurora, Pulse, Starfield, Minimal and Off are also available. Styles react to the playing audio, switch during playback without touching the playhead or lyrics, and are remembered between visits
 - The stage visualizer now draws a dark, low-opacity blue spectrum instead of a bright magenta one, so lyrics stay legible over it
 - Rewrote the app as a local, dependency-free karaoke player. The browser reads a music folder directly (File System Access API) and plays MP3+G, zipped MP3+G, audio with LRC/ELRC lyrics, and MP4 files; the queue, favourites and display settings are remembered locally
 - Removed the React client, the Koa server, the webpack/babel/vitest toolchain and all runtime dependencies. `npm start` serves the static app with Node's standard library, and the tests now use `node:test`
