@@ -4,22 +4,7 @@ import { enableAudioTrack, listAudioTracks } from './audio-tracks.js'
 import { parseLyrics } from './lrc.js'
 import { audioMimeType } from './library.js'
 import { readZipEntry } from './zip.js'
-
-/**
- * Cool, low-alpha colours for the stage visualizer. The spectrum sits behind
- * the lyrics, so it must stay dark and desaturated rather than becoming a
- * bright background of its own.
- */
-export const VISUALIZER_COLORS = Object.freeze({
-  barGradient: [
-    'rgba(124, 154, 189, 0.38)',
-    'rgba(84, 112, 148, 0.32)',
-    'rgba(61, 84, 116, 0.38)',
-  ],
-  glow: [86, 120, 160],
-  glowAlpha: 0.08,
-  reflectionAlpha: 0.18,
-})
+import { DEFAULT_VISUAL_STYLE, drawVisualizerFrame, normalizeVisualStyle, visualStyleUsesTimeDomain } from './visualizer.js'
 
 const ERROR_MESSAGES = {
   1: 'Playback was aborted',
@@ -56,6 +41,7 @@ export default class KaraokePlayer {
       cdgAlpha: 0.5,
       cdgSize: 0.65,
       visualizer: true,
+      visualStyle: DEFAULT_VISUAL_STYLE,
       sensitivity: 1,
     }
 
@@ -66,6 +52,8 @@ export default class KaraokePlayer {
     this.gainNode = null
     this.analyser = null
     this.frequencyData = null
+    this.timeData = null
+    this.visualState = {}
     this.connectedElements = new WeakSet()
     this.visualizerSize = { width: 0, height: 0, dpr: 1 }
 
@@ -110,13 +98,24 @@ export default class KaraokePlayer {
   }
 
   setOptions (options) {
+    const previousStyle = this.options.visualStyle
     this.options = { ...this.options, ...options }
+    this.options.visualStyle = normalizeVisualStyle(this.options.visualStyle)
+
     const visualizerMode = this.mode === 'cdg' || this.mode === 'lrc'
-    this.els.visualizer.hidden = !this.options.visualizer || !visualizerMode
-    if (!this.options.visualizer) this.clearVisualizer()
+    const visualizerEnabled = this.options.visualizer && this.options.visualStyle !== 'off'
+    this.els.visualizer.hidden = !visualizerEnabled || !visualizerMode
+    if (!visualizerEnabled) this.clearVisualizer()
 
     if (this.mode === 'cdg') {
       this.layoutCDG(true)
+    }
+
+    // Redraw immediately so a style change is visible while paused as well as
+    // during playback. The shared animation loop is never restarted.
+    if (previousStyle !== this.options.visualStyle) {
+      this.visualState = {}
+      if (visualizerEnabled && visualizerMode) this.drawVisualizer()
     }
   }
 
@@ -246,7 +245,7 @@ export default class KaraokePlayer {
       this.els.video.hidden = this.mode !== 'mp4'
       this.els.backdrop.hidden = this.mode !== 'cdg'
       this.els.lyricsLayer.hidden = this.mode !== 'lrc'
-      this.els.visualizer.hidden = !visualizerMode || !this.options.visualizer
+      this.els.visualizer.hidden = !visualizerMode || !this.options.visualizer || this.options.visualStyle === 'off'
 
       if (this.mode === 'cdg') {
         this.layoutCDG(true)
@@ -639,54 +638,34 @@ export default class KaraokePlayer {
   }
 
   drawVisualizer () {
-    if (!this.analyser || !this.frequencyData || !this.options.visualizer) return
+    const style = normalizeVisualStyle(this.options.visualStyle)
+    if (!this.analyser || !this.frequencyData || !this.options.visualizer || style === 'off') return
 
     const canvas = this.els.visualizer
     const ctx = canvas.getContext('2d')
     const { width, height, dpr } = this.visualizerSize
-    if (!width || !height) return
+    if (!ctx || !width || !height) return
 
     this.analyser.getByteFrequencyData(this.frequencyData)
-    ctx.clearRect(0, 0, width, height)
-
-    const bars = 40
-    const gap = 3 * dpr
-    const barWidth = (width - gap * (bars - 1)) / bars
-    const sensitivity = this.options.sensitivity
-    const baseline = height * 0.42
-    const maxHeight = height * 0.5
-
-    const [topColor, midColor, baseColor] = VISUALIZER_COLORS.barGradient
-    const gradient = ctx.createLinearGradient(0, baseline - maxHeight, 0, baseline)
-    gradient.addColorStop(0, topColor)
-    gradient.addColorStop(0.55, midColor)
-    gradient.addColorStop(1, baseColor)
-    ctx.fillStyle = gradient
-
-    for (let i = 0; i < bars; i++) {
-      const sample = Math.floor((i / bars) * (this.frequencyData.length * 0.7))
-      const value = this.frequencyData[sample] / 255
-      const barHeight = Math.max(2 * dpr, value * maxHeight * sensitivity)
-      const x = i * (barWidth + gap)
-      ctx.fillRect(x, baseline - barHeight / 2, barWidth, barHeight)
-
-      ctx.globalAlpha = VISUALIZER_COLORS.reflectionAlpha
-      ctx.fillRect(x, baseline + barHeight / 2, barWidth, barHeight * 0.35)
-      ctx.globalAlpha = 1
+    if (visualStyleUsesTimeDomain(style) && typeof this.analyser.getByteTimeDomainData === 'function') {
+      if (!this.timeData || this.timeData.length !== this.analyser.fftSize) {
+        this.timeData = new Uint8Array(this.analyser.fftSize)
+      }
+      this.analyser.getByteTimeDomainData(this.timeData)
     }
 
-    // Soft glow that responds to overall level.
-    let total = 0
-    for (let i = 0; i < 32; i++) total += this.frequencyData[i]
-    const glow = Math.min(1, (total / (32 * 255)) * sensitivity)
-    const radial = ctx.createRadialGradient(
-      width / 2, height * 0.75, 0,
-      width / 2, height * 0.75, width * 0.55,
-    )
-    radial.addColorStop(0, `rgba(${VISUALIZER_COLORS.glow.join(', ')}, ${VISUALIZER_COLORS.glowAlpha * glow})`)
-    radial.addColorStop(1, 'rgba(0, 0, 0, 0)')
-    ctx.fillStyle = radial
-    ctx.fillRect(0, 0, width, height)
+    ctx.clearRect(0, 0, width, height)
+    drawVisualizerFrame(ctx, {
+      style,
+      width,
+      height,
+      dpr,
+      frequencyData: this.frequencyData,
+      timeData: this.timeData,
+      sensitivity: this.options.sensitivity,
+      now: performance.now(),
+      state: this.visualState,
+    })
   }
 
   destroy () {
