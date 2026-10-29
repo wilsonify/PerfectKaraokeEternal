@@ -50,7 +50,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -155,6 +156,7 @@ svg.icon {
 .btn:focus-visible,
 .icon-btn:focus-visible,
 input:focus-visible,
+select:focus-visible,
 summary:focus-visible,
 .song-main:focus-visible {
   outline: 2px solid var(--cyan);
@@ -1324,6 +1326,17 @@ kbd {
 .field output {
   color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.field select {
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgba(11, 20, 36, 0.96);
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
 }
 
 .checkbox {
