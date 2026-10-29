@@ -110,11 +110,55 @@ function normalizeLetters (text) {
 }
 
 /**
- * Attach word timings to LRC lines. ELRC repeats the full line as a header
- * followed by word entries; the header is skipped, then each word is matched
- * against the line's remaining letters so punctuation and curly quotes do not
- * shift timings onto the wrong token.
+ * Match timestamped ELRC entries to the tokens of one lyric line. The full
+ * line header is skipped, then each word advances through the line's letters,
+ * so punctuation and curly quotes never shift a timing onto the wrong token.
  */
+function alignWordsToLine (text, entries) {
+  const tokens = text.split(/\s+/u).filter(Boolean)
+  const spans = []
+  let flat = ''
+
+  for (const token of tokens) {
+    const letters = normalizeLetters(token)
+    spans.push({ start: flat.length, end: flat.length + letters.length })
+    flat += letters
+  }
+
+  if (!flat) return []
+
+  const times = tokens.map(() => null)
+  let cursor = 0
+  let headerSkipped = false
+
+  for (const entry of entries) {
+    const word = normalizeLetters(entry.text)
+    if (!word) continue
+    if (word === flat && !headerSkipped) {
+      headerSkipped = true
+      continue
+    }
+    if (flat.indexOf(word, cursor) !== cursor) continue
+
+    for (let tokenIndex = 0; tokenIndex < spans.length; tokenIndex++) {
+      const span = spans[tokenIndex]
+      if (times[tokenIndex] === null && span.end > cursor && span.start < cursor + word.length) {
+        times[tokenIndex] = entry.time
+      }
+    }
+
+    cursor += word.length
+    if (cursor >= flat.length) break
+  }
+
+  return tokens
+    .map((token, tokenIndex) => times[tokenIndex] === null
+      ? null
+      : { text: token, time: times[tokenIndex] })
+    .filter(Boolean)
+}
+
+/** Attach ELRC word timings to lines supplied by an LRC file. */
 function attachWordTimings (lines, entries) {
   const lineEntries = lines.map(() => [])
   let lineIndex = 0
@@ -127,47 +171,7 @@ function attachWordTimings (lines, entries) {
   }
 
   for (let index = 0; index < lines.length; index++) {
-    const tokens = lines[index].text.split(/\s+/u).filter(Boolean)
-    const spans = []
-    let flat = ''
-
-    for (const token of tokens) {
-      const letters = normalizeLetters(token)
-      spans.push({ start: flat.length, end: flat.length + letters.length })
-      flat += letters
-    }
-
-    if (!flat) continue
-
-    const times = tokens.map(() => null)
-    let cursor = 0
-    let headerSkipped = false
-
-    for (const entry of lineEntries[index]) {
-      const word = normalizeLetters(entry.text)
-      if (!word) continue
-      if (word === flat && !headerSkipped) {
-        headerSkipped = true
-        continue
-      }
-      if (flat.indexOf(word, cursor) !== cursor) continue
-
-      for (let tokenIndex = 0; tokenIndex < spans.length; tokenIndex++) {
-        const span = spans[tokenIndex]
-        if (times[tokenIndex] === null && span.end > cursor && span.start < cursor + word.length) {
-          times[tokenIndex] = entry.time
-        }
-      }
-
-      cursor += word.length
-      if (cursor >= flat.length) break
-    }
-
-    lines[index].words = tokens
-      .map((token, tokenIndex) => times[tokenIndex] === null
-        ? null
-        : { text: token, time: times[tokenIndex] })
-      .filter(Boolean)
+    lines[index].words = alignWordsToLine(lines[index].text, lineEntries[index])
   }
 
   return lines
@@ -205,10 +209,11 @@ function inferElrcLines (entries) {
     }
 
     if (consumed === expected) {
+      const wordEntries = entries.slice(index + 1, cursor).filter(entry => normalizeLetters(entry.text))
       lines.push({
         time: header.time,
         text: header.text,
-        words: entries.slice(index + 1, cursor).filter(entry => normalizeLetters(entry.text)),
+        words: alignWordsToLine(header.text, [header, ...wordEntries]),
       })
       index = cursor
     } else {
