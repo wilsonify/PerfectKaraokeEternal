@@ -1,0 +1,138 @@
+{
+  "description": "Short MP3+G excerpts from Tom and the Back Roads, used by the test suite.",
+  "license": "Original recordings supplied by the repository owner for test use. No commercial karaoke content.",
+  "sourceAlbum": "Tom and the Back Roads — Between Tides",
+  "generatedBy": "node test/fixtures/media/generate.js --album <album directory>",
+  "fixtures": [
+    {
+      "name": "Tom and the Back Roads - Breaking the Surface",
+      "artist": "Tom and the Back Roads",
+      "title": "Breaking the Surface",
+      "source": "01 - Between Tides/songs/01-breaking-the-surface/01 - Breaking the Surface - Karaoke.mp3",
+      "startSeconds": 42.005,
+      "durationSeconds": 21.029,
+      "lines": [
+        {
+          "text": "But something kept pulling upward",
+          "at": 0
+        },
+        {
+          "text": "Something I couldn't explain",
+          "at": 0.895
+        },
+        {
+          "text": "Breaking the surface",
+          "at": 2.935
+        },
+        {
+          "text": "Learning how to breathe again",
+          "at": 5.155
+        },
+        {
+          "text": "Not running from the darkness",
+          "at": 7.975
+        },
+        {
+          "text": "But finding where I begin",
+          "at": 9.535
+        },
+        {
+          "text": "Breaking the surface",
+          "at": 11.695
+        },
+        {
+          "text": "Reaching for the open sky",
+          "at": 13.835
+        },
+        {
+          "text": "I thought I was disappearing",
+          "at": 16.355
+        },
+        {
+          "text": "But I was still alive",
+          "at": 18.095
+        },
+        {
+          "text": "I carried every failure like a weight",
+          "at": 20.275
+        }
+      ],
+      "mp3": {
+        "file": "Tom and the Back Roads - Breaking the Surface.mp3",
+        "bytes": 489894,
+        "sha256": "181ac902473b615b2687bd56f7f5d6e3af5e0c7f091ad9b923211cc4fdbd69e9"
+      },
+      "cdg": {
+        "file": "Tom and the Back Roads - Breaking the Surface.cdg",
+        "bytes": 156816,
+        "sha256": "d93dddc7121cb2760ca0837e6973111358e007f5cd27561fb81043ddf9cb6393"
+      },
+      "lrc": {
+        "file": "Tom and the Back Roads - Breaking the Surface.lrc",
+        "bytes": 515
+      }
+    },
+    {
+      "name": "Tom and the Back Roads - Wires Crossed",
+      "artist": "Tom and the Back Roads",
+      "title": "Wires Crossed",
+      "source": "01 - Between Tides/songs/02-wires-crossed/02 - Wires Crossed - Karaoke.mp3",
+      "startSeconds": 33.019,
+      "durationSeconds": 20.532,
+      "lines": [
+        {
+          "text": "But somehow lost inside the crowd",
+          "at": 0
+        },
+        {
+          "text": "Wires crossed, signals lost",
+          "at": 0.821
+        },
+        {
+          "text": "We're speaking in broken code",
+          "at": 7.161
+        },
+        {
+          "text": "On a digital road",
+          "at": 11.161
+        },
+        {
+          "text": "On a digital road",
+          "at": 13.381
+        },
+        {
+          "text": "Every word we leave behind",
+          "at": 15.121
+        },
+        {
+          "text": "Every feeling we don't show",
+          "at": 19.161
+        }
+      ],
+      "mp3": {
+        "file": "Tom and the Back Roads - Wires Crossed.mp3",
+        "bytes": 483828,
+        "sha256": "b5a0d1feb0ebfcf32730a636f679f7cc56c761d8a531aa208cd15e33c174f48e"
+      },
+      "cdg": {
+        "file": "Tom and the Back Roads - Wires Crossed.cdg",
+        "bytes": 153240,
+        "sha256": "47da7fa7f1325e0abf8d738c504dbae6c29107d156d7e478916fd27d7e6ba3c6"
+      },
+      "lrc": {
+        "file": "Tom and the Back Roads - Wires Crossed.lrc",
+        "bytes": 341
+      },
+      "zip": {
+        "file": "Tom and the Back Roads - Wires Crossed.zip",
+        "bytes": 637911,
+        "sha256": "2470bd25c0f82905614f9c12b73b119879b54b8580f2b0901524f1d96b0b17ec",
+        "entries": [
+          "Tom and the Back Roads - Wires Crossed.mp3",
+          "Tom and the Back Roads - Wires Crossed.cdg",
+          "Tom and the Back Roads - Wires Crossed.lrc"
+        ]
+      }
+    }
+  ]
+}
