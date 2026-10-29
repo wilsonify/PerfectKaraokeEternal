@@ -95,6 +95,12 @@ test('parseTrackName rejects names without an artist/title delimiter', () => {
   assert.throws(() => parseTrackName('untitled'), /delimiter/)
 })
 
+test('parseTrackName rejects names that leave an empty artist or title', () => {
+  // The karaoke suffix is stripped before parsing, so this name ends in "- ".
+  assert.throws(() => parseTrackName('The Beatles - [Karaoke]'), /empty artist or title/)
+  assert.throws(() => parseTrackName(' - Title'), /empty artist or title/)
+})
+
 test('buildLibrary pairs audio with .cdg files in the same directory', async () => {
   const { tracks, warnings } = await buildLibrary([
     { file: file('Queen - Bohemian Rhapsody.mp3'), path: 'Queen - Bohemian Rhapsody.mp3' },
@@ -273,6 +279,24 @@ test('buildLibrary creates one track per song in multi-song zips', async () => {
   assert.equal(new Set(tracks.map(track => track.id)).size, 2)
   assert.ok(tracks.every(track => track.kind === 'zip'))
   assert.deepEqual(tracks.map(track => track.size).sort(), [1, 2])
+})
+
+test('buildLibrary ignores AppleDouble entries in zips', async () => {
+  const zip = makeZip([
+    ['._Real Artist - Real Song.mp3', [9]],
+    ['._Real Artist - Real Song.cdg', [9]],
+    ['Real Artist - Real Song.mp3', [1]],
+    ['Real Artist - Real Song.cdg', [2]],
+  ])
+
+  const { tracks, warnings } = await buildLibrary([
+    { file: new File([zip], 'Real.zip'), path: 'Real.zip' },
+  ])
+
+  assert.deepEqual(warnings, [])
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].artist, 'Real Artist')
+  assert.equal(tracks[0].title, 'Real Song')
 })
 
 test('buildLibrary warns about zip audio files without a .cdg', async () => {
