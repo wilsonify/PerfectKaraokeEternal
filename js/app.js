@@ -84,6 +84,9 @@ const state = {
   tracks: [],
   trackMap: new Map(),
   warnings: [],
+  lyrics: null,
+  lyricLineEls: [],
+  lyricIndex: -1,
   queue: [],
   currentId: null,
   history: [],
@@ -115,6 +118,9 @@ const els = {
   cdgLayer: $('cdg-layer'),
   backdrop: $('cdg-backdrop'),
   canvas: $('cdg-canvas'),
+  lyricsLayer: $('lyrics-layer'),
+  lyricsScroll: $('lyrics-scroll'),
+  lyricsLines: $('lyrics-lines'),
   visualizer: $('visualizer'),
   video: $('video'),
   audio: $('audio'),
@@ -282,6 +288,7 @@ function initPlayer () {
       cdgLayer: els.cdgLayer,
       backdrop: els.backdrop,
       canvas: els.canvas,
+      lyricsLayer: els.lyricsLayer,
       visualizer: els.visualizer,
       video: els.video,
       audio: els.audio,
@@ -300,6 +307,7 @@ function initPlayer () {
     visualizer: prefs.visualizer,
     sensitivity: prefs.sensitivity,
   })
+  updateLyricsStyle()
 }
 
 function handlePlayerEvent (event) {
@@ -310,6 +318,7 @@ function handlePlayerEvent (event) {
       state.media.duration = 0
       state.media.isPlaying = false
       els.audioTrack.hidden = true
+      clearLyrics()
       setStageMessage({
         kicker: 'Loading',
         title: event.track.title,
@@ -324,12 +333,14 @@ function handlePlayerEvent (event) {
       els.message.hidden = true
       showNowPlaying(event.track)
       updateAudioTrackUI(event.track)
+      showLyrics(event.lyrics)
       updateTransport()
       refreshSongStates()
       break
 
     case 'time':
       updateTimeUI(event.position, event.duration)
+      updateLyrics(event.position)
       break
 
     case 'play':
@@ -353,6 +364,10 @@ function handlePlayerEvent (event) {
 
     case 'blocked':
       showToast(event.message)
+      break
+
+    case 'unloaded':
+      clearLyrics()
       break
 
     case 'error':
@@ -385,6 +400,123 @@ function showNowPlaying (track) {
       els.nowPlaying.hidden = true
     }, 500)
   }, 5000)
+}
+
+/* -------------------------------------------------------------------------- */
+/* Synchronized LRC lyrics                                                    */
+/* -------------------------------------------------------------------------- */
+
+function updateLyricsStyle () {
+  const scale = prefs.cdgSize / DEFAULT_PREFS.cdgSize
+  els.lyricsLayer.style.setProperty('--lyrics-scale', scale.toFixed(2))
+  els.lyricsLayer.style.setProperty('--lyrics-alpha', (prefs.cdgAlpha * 0.85).toFixed(2))
+}
+
+function clearLyrics () {
+  state.lyrics = null
+  state.lyricLineEls = []
+  state.lyricIndex = -1
+  els.lyricsLines.replaceChildren()
+  els.lyricsScroll.scrollTop = 0
+}
+
+function buildLyricLine (line, index) {
+  const item = element('li', 'lyric-item')
+  const button = element('button', 'lyric-line')
+  button.type = 'button'
+  button.dataset.index = String(index)
+  button.title = `Seek to ${formatDuration(line.time)}`
+  button.setAttribute('aria-label', `Seek to: ${line.text}`)
+  button.addEventListener('click', () => seekToLyric(index))
+
+  const tokens = line.text.split(/(\s+)/u)
+  let wordIndex = 0
+
+  for (const token of tokens) {
+    if (!token) continue
+    if (/^\s+$/u.test(token)) {
+      button.append(document.createTextNode(token))
+      continue
+    }
+
+    const word = line.words[wordIndex]
+    if (word && word.text === token) {
+      const span = element('span', 'lyric-word', token)
+      span.dataset.time = String(word.time)
+      button.append(span)
+      wordIndex++
+    } else {
+      button.append(document.createTextNode(token))
+    }
+  }
+
+  item.append(button)
+  return item
+}
+
+function scrollActiveLyric (line) {
+  const container = els.lyricsScroll
+  const top = line.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+  const target = top - container.clientHeight / 2 + line.offsetHeight / 2
+  container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+}
+
+function updateLyrics (time) {
+  const lyrics = state.lyrics
+  if (!lyrics || !Number.isFinite(time)) return
+
+  let index = -1
+  for (let i = 0; i < lyrics.lines.length; i++) {
+    if (lyrics.lines[i].time <= time + 0.05) index = i
+    else break
+  }
+
+  if (index !== state.lyricIndex) {
+    state.lyricIndex = index
+
+    state.lyricLineEls.forEach((line, lineIndex) => {
+      line.classList.toggle('is-active', lineIndex === index)
+      line.classList.toggle('is-past', lineIndex < index)
+      if (lineIndex === index) line.setAttribute('aria-current', 'true')
+      else line.removeAttribute('aria-current')
+    })
+
+    if (index >= 0) scrollActiveLyric(state.lyricLineEls[index])
+  }
+
+  if (index < 0) return
+  const activeLine = state.lyricLineEls[index]
+  for (const word of activeLine.querySelectorAll('.lyric-word')) {
+    word.classList.toggle('is-sung', Number(word.dataset.time) <= time + 0.05)
+  }
+}
+
+function seekToLyric (index) {
+  const line = state.lyrics?.lines[index]
+  if (!line) return
+  player.seek(line.time)
+  updateLyrics(line.time)
+}
+
+function showLyrics (lyrics) {
+  clearLyrics()
+  if (!lyrics?.lines?.length) return
+
+  const fragment = document.createDocumentFragment()
+  const lineEls = []
+
+  lyrics.lines.forEach((line, index) => {
+    const item = buildLyricLine(line, index)
+    fragment.append(item)
+    lineEls.push(item.querySelector('.lyric-line'))
+  })
+
+  els.lyricsLines.append(fragment)
+  state.lyrics = lyrics
+  state.lyricLineEls = lineEls
+  state.lyricIndex = -1
+  updateLyricsStyle()
+  updateLyrics(state.media.position || 0)
 }
 
 function loadTrack (id, autoplay = true) {
@@ -728,12 +860,12 @@ function buildSongRow (track, { showArtist = false, tokens = [] } = {}) {
     meta.append(artist)
   }
 
-  const kinds = { cdg: 'CDG', zip: 'ZIP', mp4: 'MP4' }
+  const kinds = { 'cdg': 'CDG', 'zip': 'ZIP', 'mp4': 'MP4', 'lrc': 'LRC', 'zip-lrc': 'ZIP LRC' }
   const badge = element('span', 'badge')
   const badgeIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   badgeIcon.setAttribute('class', 'icon')
   const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
-  use.setAttribute('href', `#i-${track.kind === 'mp4' ? 'video' : track.kind === 'zip' ? 'zip' : 'music'}`)
+  use.setAttribute('href', `#i-${track.kind === 'mp4' ? 'video' : track.kind === 'zip' || track.kind === 'zip-lrc' ? 'zip' : 'music'}`)
   badgeIcon.append(use)
   badge.append(badgeIcon, document.createTextNode(kinds[track.kind] ?? track.kind))
   meta.append(badge)
@@ -908,7 +1040,7 @@ function renderLibrary () {
     els.libraryList.append(element(
       'p',
       'list-note',
-      'Open a folder containing MP3+G or MP4 karaoke files. Filenames should look like “Artist - Title.mp3” with a matching “Artist - Title.cdg”.',
+      'Open a folder containing MP3+G, LRC, or MP4 karaoke files. Audio can use a matching “Artist - Title.cdg”, “Artist - Title.lrc”, or “Artist - Title.elrc”.',
     ))
     els.alphaPicker.hidden = true
     return
@@ -1176,7 +1308,7 @@ function refreshInitialMessage () {
     setStageMessage({
       kicker: 'Scanning',
       title: 'Reading your music folder',
-      text: 'Looking for audio + .cdg pairs and MP4 videos…',
+      text: 'Looking for audio with .cdg, .lrc, or .elrc companions, plus MP4 videos…',
     })
     return
   }
@@ -1185,7 +1317,7 @@ function refreshInitialMessage () {
     setStageMessage({
       kicker: 'Ready',
       title: 'Open your karaoke folder',
-      text: 'MP3+G, zipped MP3+G, and MP4 files are supported. Everything stays on this computer.',
+      text: 'MP3+G, audio with LRC/ELRC lyrics, zipped songs, and MP4 files are supported. Everything stays on this computer.',
     })
     return
   }
@@ -1273,7 +1405,7 @@ async function scanFileList (fileList) {
   }
 
   if (records.length === 0) {
-    showToast('No MP3+G, ZIP, or MP4 files were found in that selection.')
+    showToast('No MP3+G, LRC/ELRC, ZIP, or MP4 files were found in that selection.')
     return
   }
 
@@ -1338,7 +1470,7 @@ async function scanRecords (records, sourceLabel, scanWarnings = []) {
       showStageMessage({
         kicker: 'No songs found',
         title: 'That folder had no playable karaoke files',
-        text: 'MP3+G audio needs a matching .cdg file. Files should be named “Artist - Title.mp3” and “Artist - Title.cdg”.',
+        text: 'Audio needs a matching .cdg, .lrc, or .elrc file. Name companions like “Artist - Title.mp3” and “Artist - Title.lrc”.',
       })
     }
   } catch (error) {
@@ -1404,6 +1536,7 @@ function applyOptions () {
     visualizer: prefs.visualizer,
     sensitivity: prefs.sensitivity,
   })
+  updateLyricsStyle()
   player.setReplayGainEnabled(prefs.replayGain)
   savePrefs()
   updateOptionsUI()
