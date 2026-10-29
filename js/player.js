@@ -1,5 +1,7 @@
 import CDGDecoder from './cdg.js'
 import { parseReplayGain, replayGainFactor } from './audio-tags.js'
+import { enableAudioTrack, listAudioTracks } from './audio-tracks.js'
+import { parseLyrics } from './lrc.js'
 import { audioMimeType } from './library.js'
 import { readZipEntry } from './zip.js'
 
@@ -27,6 +29,7 @@ export default class KaraokePlayer {
     this.mode = null
     this.decoder = null
     this.lastFrame = null
+    this.lyrics = null
     this.duration = 0
     this.volume = 1
     this.isPlaying = false
@@ -92,7 +95,8 @@ export default class KaraokePlayer {
 
   setOptions (options) {
     this.options = { ...this.options, ...options }
-    this.els.visualizer.hidden = !this.options.visualizer || this.mode !== 'cdg'
+    const visualizerMode = this.mode === 'cdg' || this.mode === 'lrc'
+    this.els.visualizer.hidden = !this.options.visualizer || !visualizerMode
     if (!this.options.visualizer) this.clearVisualizer()
 
     if (this.mode === 'cdg') {
@@ -108,6 +112,16 @@ export default class KaraokePlayer {
   setReplayGainEnabled (enabled) {
     this.replayGainEnabled = enabled
     this.applyGain()
+  }
+
+  /** Audio tracks exposed by the current media, or [] when unsupported. */
+  getAudioTracks () {
+    return listAudioTracks(this.media)
+  }
+
+  /** Switch to an audio track by id. False when the track is not found. */
+  selectAudioTrack (id) {
+    return this.media ? enableAudioTrack(this.media, id) : false
   }
 
   ensureAudioGraph () {
@@ -192,6 +206,7 @@ export default class KaraokePlayer {
     this.track = track
     this.decoder = null
     this.lastFrame = null
+    this.lyrics = null
     this.duration = 0
     this.replayGain = null
     this.isPlaying = false
@@ -201,21 +216,25 @@ export default class KaraokePlayer {
     try {
       if (track.kind === 'mp4') {
         await this.loadVideo(track, generation)
+      } else if (track.kind === 'lrc' || track.kind === 'zip-lrc') {
+        await this.loadLrc(track, generation)
       } else {
         await this.loadCDG(track, generation)
       }
 
       if (generation !== this.generation) return
 
+      const visualizerMode = this.mode === 'cdg' || this.mode === 'lrc'
       this.els.stage.dataset.mode = this.mode
       this.els.cdgLayer.hidden = this.mode !== 'cdg'
       this.els.video.hidden = this.mode !== 'mp4'
       this.els.backdrop.hidden = this.mode !== 'cdg'
-      this.els.visualizer.hidden = this.mode !== 'cdg' || !this.options.visualizer
+      this.els.lyricsLayer.hidden = this.mode !== 'lrc'
+      this.els.visualizer.hidden = !visualizerMode || !this.options.visualizer
 
       if (this.mode === 'cdg') {
         this.layoutCDG(true)
-        this.renderFrame(true)
+        this.renderFrame()
       }
 
       this.applyGain()
@@ -224,6 +243,7 @@ export default class KaraokePlayer {
         track,
         duration: Number.isFinite(this.duration) ? this.duration : 0,
         replayGain: this.replayGain,
+        lyrics: this.lyrics,
       })
 
       if (autoplay) await this.play()
@@ -406,7 +426,7 @@ export default class KaraokePlayer {
     if (!this.media) return
     this.pause()
     this.media.currentTime = 0
-    if (this.mode === 'cdg') this.renderFrame(true)
+    if (this.mode === 'cdg') this.renderFrame()
     this.emitTime()
   }
 
@@ -443,7 +463,7 @@ export default class KaraokePlayer {
 
   handleSeeked (element) {
     if (element !== this.media) return
-    if (this.mode === 'cdg') this.renderFrame(true)
+    if (this.mode === 'cdg') this.renderFrame()
     this.emitTime()
   }
 
@@ -472,7 +492,7 @@ export default class KaraokePlayer {
 
       if (this.mode === 'cdg') {
         try {
-          this.renderFrame(false)
+          this.renderFrame()
         } catch (error) {
           this.fail(`${this.track?.sourceName ?? 'CDG'}: ${error.message}`)
           return
@@ -485,12 +505,16 @@ export default class KaraokePlayer {
     this.frameId = requestAnimationFrame(tick)
   }
 
-  renderFrame (forceKey) {
+  renderFrame () {
     if (!this.decoder || !this.media) return
-    const frame = this.decoder.render(this.media.currentTime || 0, { forceKey })
-    if (!frame.isChanged && !forceKey) return
+
+    // Upstream keyed the CDG background out on every frame so the visualizer
+    // and stage show through. The lyric panel is drawn separately from
+    // `contentBounds`, so the CDG background should never be painted opaque.
+    const frame = this.decoder.render(this.media.currentTime || 0, { forceKey: true })
+    if (!frame.isChanged) return
     this.lastFrame = frame
-    this.drawFrame(frame, forceKey)
+    this.drawFrame(frame, true)
   }
 
   drawFrame (frame, updateBackdrop = true) {
