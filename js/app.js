@@ -1371,6 +1371,12 @@ function setScanning (value) {
   if (state.folderHandle) els.reopenFolder.disabled = value
 }
 
+function shouldUseFileInputFolderPicker () {
+  // VS Code's embedded browser runs on Electron where showDirectoryPicker can
+  // be present but not reliably complete the folder selection flow.
+  return /\bElectron\//.test(navigator.userAgent)
+}
+
 async function scanDirectoryHandle (handle) {
   const permission = await handle.requestPermission({ mode: 'read' })
   if (permission !== 'granted') {
@@ -1493,7 +1499,7 @@ async function scanRecords (records, sourceLabel, scanWarnings = []) {
 }
 
 async function openFolder () {
-  if (!window.showDirectoryPicker || !window.isSecureContext) {
+  if (!window.showDirectoryPicker || !window.isSecureContext || shouldUseFileInputFolderPicker()) {
     els.folderInput.click()
     return
   }
@@ -1502,7 +1508,11 @@ async function openFolder () {
     const handle = await window.showDirectoryPicker({ mode: 'read' })
     await scanDirectoryHandle(handle)
   } catch (error) {
-    if (error.name !== 'AbortError') showToast(`Could not open that folder: ${error.message}`)
+    if (error.name !== 'AbortError') {
+      // If the native picker path fails, fall back to the broadest-compatible
+      // directory input so users can still load their library.
+      els.folderInput.click()
+    }
   }
 }
 
@@ -1853,7 +1863,7 @@ async function init () {
     state.folderHandle = handle
     els.reopenFolder.hidden = false
     els.reopenLabel.textContent = `Reopen “${handle.name}”`
-  } else if (!window.showDirectoryPicker || !window.isSecureContext) {
+  } else if (!window.showDirectoryPicker || !window.isSecureContext || shouldUseFileInputFolderPicker()) {
     // Let people know why the folder button opens a file picker.
     els.openFolder.title = 'Choose a folder (browser file picker)'
   }
