@@ -396,6 +396,34 @@ test('buildLibrary pairs LRC case-insensitively without an ELRC', async () => {
   assert.equal(tracks[0].lrcFile.name, 'case artist - case song.LRC')
 })
 
+test('buildLibrary matches "- Karaoke" audio with base-name LRC companions', async () => {
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('Artist - Song - Karaoke.mp3'), path: 'Artist - Song - Karaoke.mp3' },
+    { file: textFile('Artist - Song.lrc', lrcText), path: 'Artist - Song.lrc' },
+    { file: textFile('Artist - Song.elrc', elrcText), path: 'Artist - Song.elrc' },
+  ])
+
+  assert.equal(warnings.length, 0)
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].kind, 'lrc')
+  assert.equal(tracks[0].sourceName, 'Artist - Song - Karaoke.mp3')
+  assert.equal(tracks[0].lrcFile.name, 'Artist - Song.lrc')
+  assert.equal(tracks[0].elrcFile.name, 'Artist - Song.elrc')
+})
+
+test('buildLibrary prefers karaoke audio when both plain and karaoke copies exist', async () => {
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('Artist - Song.mp3'), path: 'Artist - Song.mp3' },
+    { file: file('Artist - Song - Karaoke.mp3'), path: 'Artist - Song - Karaoke.mp3' },
+    { file: textFile('Artist - Song.lrc', lrcText), path: 'Artist - Song.lrc' },
+  ])
+
+  assert.equal(warnings.length, 0)
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].kind, 'lrc')
+  assert.equal(tracks[0].sourceName, 'Artist - Song - Karaoke.mp3')
+})
+
 test('buildLibrary supports ELRC-only lyrics with usable line headers', async () => {
   const { tracks, warnings } = await buildLibrary([
     { file: file('ELRC Artist - Header Song.mp3'), path: 'ELRC Artist - Header Song.mp3' },
