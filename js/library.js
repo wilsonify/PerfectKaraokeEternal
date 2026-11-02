@@ -199,10 +199,21 @@ function companionKey (path) {
 }
 
 function stripKaraokeSuffix (baseName) {
-  return baseName
-    .replace(/\s*[-–—]\s*karaoke\s*$/i, '')
-    .replace(/\s*\(\s*karaoke\s*\)\s*$/i, '')
-    .trim()
+  let value = String(baseName).trim()
+  const lower = () => value.toLowerCase()
+
+  if (lower().endsWith('(karaoke)')) {
+    value = value.slice(0, -'(karaoke)'.length).trim()
+  }
+
+  if (lower().endsWith(' karaoke')) {
+    value = value.slice(0, -' karaoke'.length).trimEnd()
+    if (value.endsWith('-') || value.endsWith('–') || value.endsWith('—')) {
+      value = value.slice(0, -1).trimEnd()
+    }
+  }
+
+  return value
 }
 
 function karaokeCompanionKey (path) {
