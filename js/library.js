@@ -198,8 +198,28 @@ function companionKey (path) {
   return `${dirName(path)}/${getBaseName(fileName(path)).toLowerCase()}`
 }
 
+function stripKaraokeSuffix (baseName) {
+  return baseName
+    .replace(/\s*[-–—]\s*karaoke\s*$/i, '')
+    .replace(/\s*\(\s*karaoke\s*\)\s*$/i, '')
+    .trim()
+}
+
+function karaokeCompanionKey (path) {
+  const directory = dirName(path)
+  const base = stripKaraokeSuffix(getBaseName(fileName(path)).toLowerCase())
+  return `${directory}/${base}`
+}
+
+function audioIsKaraokeVariant (path) {
+  const base = getBaseName(fileName(path))
+  return stripKaraokeSuffix(base) !== base
+}
+
 function findCompanion (index, audioPath) {
-  return index.get(companionKey(audioPath)) ?? null
+  const exact = companionKey(audioPath)
+  const fallback = karaokeCompanionKey(audioPath)
+  return index.get(exact) ?? index.get(fallback) ?? null
 }
 
 async function elrcFileHasLyrics (file) {
@@ -326,6 +346,7 @@ export async function buildLibrary (records, { onProgress } = {}) {
   const warnings = []
   const tracks = []
   const indexes = { cdg: new Map(), lrc: new Map(), elrc: new Map() }
+  const karaokeCompanionKeys = new Set()
   const seen = new Set()
   const candidates = records.filter((record) => {
     if (!SUPPORTED_EXTENSIONS.includes(getExtension(record.file.name))) return false
@@ -336,6 +357,9 @@ export async function buildLibrary (records, { onProgress } = {}) {
 
   for (const record of candidates) {
     const extension = getExtension(record.file.name)
+    if (CDG_AUDIO_EXTENSIONS.includes(extension) && audioIsKaraokeVariant(record.path)) {
+      karaokeCompanionKeys.add(karaokeCompanionKey(record.path))
+    }
     if (extension === '.cdg' || extension === '.lrc' || extension === '.elrc') {
       indexes[extension.slice(1)].set(companionKey(record.path), record)
     }
@@ -410,6 +434,12 @@ export async function buildLibrary (records, { onProgress } = {}) {
           size: record.file.size,
         }))
       } else if (CDG_AUDIO_EXTENSIONS.includes(extension)) {
+        const normalizedKey = karaokeCompanionKey(record.path)
+        if (!audioIsKaraokeVariant(record.path) && karaokeCompanionKeys.has(normalizedKey)) {
+          // Prefer "Song - Karaoke.mp3" over duplicate plain audio when both exist.
+          continue
+        }
+
         const cdg = findCompanion(indexes.cdg, record.path)
         const lrc = cdg ? null : findCompanion(indexes.lrc, record.path)
         let elrc = cdg ? null : findCompanion(indexes.elrc, record.path)
