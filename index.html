@@ -177,6 +177,14 @@
           </button>
         </div>
 
+        <div id="media-filters" class="media-filters" role="group" aria-label="Filter songs by media type">
+          <button type="button" class="chip" data-media="all" aria-pressed="true">All</button>
+          <button type="button" class="chip" data-media="cdg" aria-pressed="false">CD+G</button>
+          <button type="button" class="chip" data-media="lyrics" aria-pressed="false">LRC</button>
+          <button type="button" class="chip" data-media="video" aria-pressed="false">MP4</button>
+          <button type="button" class="chip" data-media="zip" aria-pressed="false">ZIP</button>
+        </div>
+
         <p class="library-summary" id="library-summary" aria-live="polite"></p>
         <div id="warnings" class="warnings" hidden></div>
         <nav id="alpha-picker" class="alpha-picker" aria-label="Jump to artist" hidden></nav>
@@ -189,6 +197,7 @@
           <button type="button" id="clear-queue" class="btn ghost" disabled>Clear</button>
         </div>
         <div id="current-card" class="current-card" hidden></div>
+        <p id="queue-summary" class="queue-summary" aria-live="polite" hidden></p>
         <p id="queue-empty" class="empty-state">Nothing queued yet. Pick a song from the library.</p>
         <ol id="queue-list" class="queue-list"></ol>
         <div id="history-section" hidden>
