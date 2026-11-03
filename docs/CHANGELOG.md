@@ -1,4 +1,4 @@
-## TBD
+## [Unreleased]
 
 - Library browsing now has media-type filter chips (CD+G, LRC, MP4, ZIP), a single keyboard tab stop with `↑`/`↓`/`Home`/`End` navigation, `Enter` to queue and `Shift+Enter` to play now, plus clear selected/current/next states in the song list
 - Every song and queue row now shows what it can play (audio format, CD+G, LRC, ELRC, ZIP, MP4), duplicate queue entries are counted, the first queued song is marked "Next", and queue duration is estimated from fast MP3 header reads
@@ -6,6 +6,7 @@
 - Artist groups merge alternate spellings of the same name ("The Beatles" / "Beatles, The"), and song rows, queue rows and the current-song card show consistent media capabilities
 - Improved the idle stage with the number of loaded songs and keyboard hints, and moved the toast away from the transport controls
 - Added a "Move to front" queue action and clearer next/current queue markers; queue duration totals note how many entries still have an unknown duration
+- Pressing **Next** after a song has already ended no longer appends it to the Played history a second time
 - Increased song-row and action-button target sizes, improved muted-text contrast, and added visible focus rings to filter chips and list navigation
 - Added regression tests for media capabilities, filters, diagnostics, duration summaries and MP3 duration estimation
 
@@ -25,6 +26,8 @@
 - Keyboard shortcuts keep working after a button, slider or link receives focus. Keys owned by the focused control are left alone (`Space`/`Enter` still activate buttons, arrows still adjust sliders and selects, typing in search is untouched), and `Esc` now clears the search field
 - LRC `[offset:±ms]` tags are applied in the documented direction, and Enhanced LRC inline `<mm:ss.xx>` word timings now drive word highlighting
 - **Add files** and drag-and-drop now add to the loaded library instead of replacing it; a rebuilt track replaces its old entry, and repeated scan warnings are deduplicated
+
+> **Upstream history:** The releases below are inherited from [KaraokeEternal](https://github.com/bhj/KaraokeEternal) and describe its hosted server product — accounts, rooms, QR joining, the server-side media scanner and the React client. This fork removed all of that; only [README.md](../README.md) and [openspec/specs/](../openspec/specs/) describe what applies to this app today.
 
 ## v2.0.2 (2026-02-14)
 
