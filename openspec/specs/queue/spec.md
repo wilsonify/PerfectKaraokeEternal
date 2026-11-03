@@ -67,21 +67,35 @@ When a track ends naturally, playback SHALL advance to the next queued song and 
 
 ### Requirement: Queue totals
 
-The queue heading SHALL report the number of upcoming songs, an estimated total duration computed from known durations, and how many entries still have an unknown duration. Estimated totals SHALL be formatted with a `~` prefix.
+The queue heading SHALL report the number of upcoming songs, an estimated total duration computed from known durations (a rounded label such as `12 min`), and how many entries still have an unknown duration. Individual estimated durations, in queue rows and in the up-next line, SHALL be prefixed with `~`; the total itself carries no prefix.
 
 #### Scenario: Total with unknown durations
 
 - **GIVEN** a queue where two songs have durations and one does not
 - **WHEN** the queue heading is rendered
-- **THEN** it shows the estimated total with `~`
+- **THEN** it shows the rounded estimated total (without a `~` prefix)
 - **AND** states how many entries have unknown durations
 
 ### Requirement: Queue persistence
 
-Queue, history and the current track SHALL be remembered across reloads in local session storage and restored on the next visit, bounded to a reasonable history size (200 entries).
+Queue, history and the current track SHALL be remembered across reloads in browser local storage (key `pke.session.v1`) and restored on the next visit, with history bounded to the most recent 200 entries. Restored entries whose media is unavailable SHALL be shown as unavailable before a folder loads, and removed after a scan that does not contain them while the order of the rest is preserved and the removal is reported.
 
 #### Scenario: Queue survives a reload
 
 - **GIVEN** a queue with three songs
 - **WHEN** the page is reloaded
 - **THEN** the same queue, history and current track are restored
+
+#### Scenario: Restored entries before a folder loads
+
+- **GIVEN** a saved queue and no library loaded yet
+- **WHEN** the queue is shown
+- **THEN** each saved entry appears as unavailable with guidance to reopen the folder
+- **AND** the entries are still saved
+
+#### Scenario: Scan without the queued media
+
+- **GIVEN** a saved queue referencing songs in another folder
+- **WHEN** a folder containing none of them is scanned
+- **THEN** those entries are removed from the queue and history
+- **AND** a toast reports that some saved queue entries were not found
