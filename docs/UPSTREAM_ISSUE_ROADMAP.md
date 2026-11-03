@@ -38,7 +38,7 @@ The rewrite intentionally removed the Koa/React/SQLite server, accounts, rooms, 
 
 Classification counts sum to 54. Priorities are P1: 1, P2: 10, P3: 43.
 
-Local status counts are `FIXED`: 1, `TEST ADDED`: 3, `VERIFIED`: 6, `IN PROGRESS`: 1, `NEEDS INVESTIGATION`: 1, `DEFERRED`: 11, `OUT OF SCOPE`: 31; these sum to 54.
+Local status counts are `FIXED`: 1, `TEST ADDED`: 3, `VERIFIED`: 7, `IN PROGRESS`: 1, `DEFERRED`: 11, `OUT OF SCOPE`: 31; these sum to 54.
 
 **What changed locally:**
 
@@ -50,7 +50,7 @@ Local status counts are `FIXED`: 1, `TEST ADDED`: 3, `VERIFIED`: 6, `IN PROGRESS
 
 ## 3. Complete issue inventory
 
-Every upstream issue appears exactly once. “Upstream state” is the state on 2026-10-28; “Local status” is independent of it. Links point to the original GitHub issue.
+Every upstream issue appears exactly once. “Upstream state” is the state on 2026-10-28 and is **frozen at the audit date** (upstream may have moved on since); “Local status” is independent of it and is the **maintained** column — update it, with a dated note, as local work lands. Links point to the original GitHub issue.
 
 | Issue | Title | Upstream state | Classification | Priority | Local status | Evidence / rationale |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -85,7 +85,7 @@ Every upstream issue appears exactly once. “Upstream state” is the state on 
 | [#51](https://github.com/bhj/KaraokeEternal/issues/51) | [Feature Request] Video or image/slideshow backgrounds | open | DEFERRED | P3 | DEFERRED | Custom video/image backgrounds need a persisted media source, layering and file-permission design; the current visualizer is deliberately lightweight. |
 | [#53](https://github.com/bhj/KaraokeEternal/issues/53) | Metadata parsing / file format parsing does not work for Hebrew | closed | ALREADY_SUPPORTED | P2 | TEST ADDED | Hebrew Artist - Title names parse correctly and an RTL regression fixture was added. Configurable title-first parsing is still not supported. |
 | [#54](https://github.com/bhj/KaraokeEternal/issues/54) | Control brightness of player background | closed | PARTIAL | P3 | DEFERRED | CDG background alpha and a visualizer toggle exist; there is no separate visualizer brightness control. |
-| [#55](https://github.com/bhj/KaraokeEternal/issues/55) | Text background doesn't match text | closed | UNVERIFIED | P2 | NEEDS INVESTIGATION | The original report was a browser-specific backdrop-filter mismatch and was never confirmed. The rewrite recomputes content bounds per frame and tests them, but no reproduction of the reported visual bug is available. |
+| [#55](https://github.com/bhj/KaraokeEternal/issues/55) | Text background doesn't match text | closed | UNVERIFIED | P2 | VERIFIED (2026-10-29) | Local backdrop behavior verified: the backdrop is derived from `contentBounds` plus 10 px padding on every changed frame, with a decoder regression test covering growth, shrink and seek-reset (QA report §3, #55). The upstream reporter's original browser-specific paint bug was never confirmed and remains unreproduced, which is why the upstream classification stays UNVERIFIED. |
 | [#56](https://github.com/bhj/KaraokeEternal/issues/56) | Better way to get queue options for desktop. | closed | ALREADY_SUPPORTED | P3 | VERIFIED | Queue rows expose visible play, move and remove buttons plus drag handles on desktop; no swipe-only interaction. |
 | [#58](https://github.com/bhj/KaraokeEternal/issues/58) | [Feedback Wanted] User permissions | open | NOT_APPLICABLE | P3 | OUT OF SCOPE | Role-based permissions require accounts, rooms and server authorization. |
 | [#59](https://github.com/bhj/KaraokeEternal/issues/59) | [Feature Request] Android/Google/Apple TV App Frontend | closed | NOT_APPLICABLE | P3 | OUT OF SCOPE | Native TV frontends are outside the browser-only local scope. |
@@ -268,7 +268,7 @@ Ordered by value, risk and cost rather than upstream issue age.
 
 ### Phase 1 — Core usability and verification (next)
 
-1. **Investigate #55 with real CD+G media** (P2). Reproduce in Chromium and Firefox with the same file; compare `contentBounds` and the backdrop rectangle across pause, seek and resize. Acceptance: either a reproducible mismatch is fixed with a regression test, or the browser limitation is documented with evidence. Risk: the original report was never confirmed and may be a browser paint bug.
+1. **Investigate #55 with real CD+G media** (P2, **done 2026-10-29**). Reproduced with a purpose-built CD+G whose lyric area grows: backdrop bounds track `contentBounds` + 10 px across pause, seek and resize, and a decoder regression test now locks growth and reset in. See `docs/QA_REPORT_2026-10-29.md` §3 (#55). Residual: the upstream reporter's original browser-specific paint bug was never confirmed and remains unreproduced.
 2. **Run a browser playback matrix** (P2). Chrome/Edge, Firefox and Safari; open a folder, load MP3+G, pause/resume, seek backwards, let a track end, repeat the same track, and leave a long track playing. Acceptance: no console errors, no stale lyrics after seek, no growing blob URLs, audio remains the timing source. Current automated evidence is Chromium only.
 3. **Validate #79 on Safari** (P2). Use a real MP4 with two labelled audio tracks. Acceptance criteria are in section 5. If Safari also hides the tracks for the test file, document the exact container/track requirement and keep the selector hidden.
 4. **Static-server hardening (done 2026-10-29).** The server now serves only `index.html`, `css/`, `js/` and `assets/`; `.git`, tests, docs and `node_modules` return 404. It binds to `127.0.0.1` by default, and `--host`/`HOST` is an explicit opt-in for LAN access. Covered by `test/serve.test.js` and recorded in `docs/QA_REPORT_2026-10-29.md`.
@@ -305,7 +305,7 @@ curl http://127.0.0.1:4173/js/player.js     -> 200 text/javascript
 curl -I <fixture>                            -> 200
 ```
 
-> This verification snapshot is from the 2026-10-28 audit. After the follow-up QA pass on 2026-10-29 the suite has 72 tests; see `docs/QA_REPORT_2026-10-29.md` for current results and remaining manual checks.
+> This verification snapshot is from the 2026-10-28 audit. After the follow-up QA pass on 2026-10-29 the suite had 72 tests (see `docs/QA_REPORT_2026-10-29.md` for that review's results and remaining manual checks); the suite has since grown to 110 tests. The live count is tracked in `docs/README.md`.
 
 ### Browser checks (Chromium, Windows)
 
