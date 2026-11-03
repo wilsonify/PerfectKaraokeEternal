@@ -8,7 +8,7 @@ Describe MP4 karaoke video playback and the optional multi-audio-track selector,
 
 ### Requirement: MP4 files are playable tracks
 
-MP4 files SHALL be accepted into the library as playable video tracks without requiring a lyrics companion.
+MP4 files SHALL be accepted into the library as playable video tracks without requiring a lyrics companion. Like audio files, an MP4 still needs a filename the parser can split into artist and title; a name without that delimiter SHALL be reported as skipped with an unreadable-filename diagnostic instead of appearing as a track.
 
 #### Scenario: MP4 in a scanned folder
 
