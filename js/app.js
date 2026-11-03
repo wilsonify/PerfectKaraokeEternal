@@ -5,11 +5,14 @@ import {
   formatSize,
   getExtension,
   groupByArtist,
+  mergeTracks,
+  mergeWarnings,
   searchTracks,
   SUPPORTED_EXTENSIONS,
 } from './library.js'
 import { describeAudioTrack } from './audio-tracks.js'
 import KaraokePlayer from './player.js'
+import { resolveShortcut } from './shortcuts.js'
 import {
   DEFAULT_VISUAL_STYLE,
   normalizeVisualStyle,
@@ -1410,7 +1413,7 @@ async function scanDirectoryHandle (handle) {
   }
 }
 
-async function scanFileList (fileList) {
+async function scanFileList (fileList, { append = false } = {}) {
   const records = []
 
   for (const file of fileList) {
@@ -1426,13 +1429,13 @@ async function scanFileList (fileList) {
     return
   }
 
-  await scanRecords(records, 'selected files')
+  await scanRecords(records, 'selected files', [], { append })
 }
 
-async function scanRecords (records, sourceLabel, scanWarnings = []) {
+async function scanRecords (records, sourceLabel, scanWarnings = [], { append = false } = {}) {
   setScanning(true)
   setScanStatus(`Scanning ${sourceLabel}…`)
-  state.warnings = [...scanWarnings]
+  if (!append) state.warnings = [...scanWarnings]
   els.libraryList.replaceChildren()
   refreshInitialMessage()
 
@@ -1443,9 +1446,12 @@ async function scanRecords (records, sourceLabel, scanWarnings = []) {
       },
     })
 
-    state.tracks = result.tracks
-    state.trackMap = new Map(result.tracks.map(track => [track.id, track]))
-    state.warnings = [...scanWarnings, ...result.warnings]
+    // A folder scan replaces the library, but files dropped onto a populated
+    // library add to it instead of wiping what is already loaded.
+    state.tracks = append ? mergeTracks(state.tracks, result.tracks) : result.tracks
+    state.trackMap = new Map(state.tracks.map(track => [track.id, track]))
+    const warnings = [...scanWarnings, ...result.warnings]
+    state.warnings = append ? mergeWarnings(state.warnings, warnings) : warnings
     state.visibleArtists = 60
     state.visibleResults = 200
 
@@ -1482,7 +1488,15 @@ async function scanRecords (records, sourceLabel, scanWarnings = []) {
     refreshInitialMessage()
 
     if (state.tracks.length) {
-      showToast(`Loaded ${state.tracks.length} songs${state.warnings.length ? ` (${state.warnings.length} skipped)` : ''}.`)
+      const skipped = warnings.length ? ` (${warnings.length} skipped)` : ''
+      if (append) {
+        const added = result.tracks.length
+        showToast(added
+          ? `Added ${added} song${added === 1 ? '' : 's'} (${state.tracks.length} total)${skipped}.`
+          : `No new songs were found${skipped}.`)
+      } else {
+        showToast(`Loaded ${state.tracks.length} songs${skipped}.`)
+      }
     } else {
       showStageMessage({
         kicker: 'No songs found',
@@ -1493,6 +1507,9 @@ async function scanRecords (records, sourceLabel, scanWarnings = []) {
   } catch (error) {
     setScanning(false)
     setScanStatus('Scan failed.')
+    // The list was cleared for the scan; restore the tracks that are still in
+    // state so a failed add does not leave the library panel blank.
+    renderLibrary()
     refreshInitialMessage()
     showToast(`Could not scan files: ${error.message}`)
   }
@@ -1659,6 +1676,16 @@ function setVolume (volume, { save = true } = {}) {
   if (save) savePrefs()
 }
 
+function clearSearch () {
+  clearTimeout(searchTimer)
+  searchTimer = null
+  els.search.value = ''
+  state.filter = ''
+  state.visibleResults = 200
+  state.visibleArtists = 60
+  renderLibrary()
+}
+
 function toggleMute () {
   if (prefs.volume > 0) {
     state.lastVolume = prefs.volume
@@ -1683,7 +1710,7 @@ function bindEvents () {
   })
 
   els.filesInput.addEventListener('change', async () => {
-    if (els.filesInput.files?.length) await scanFileList(els.filesInput.files)
+    if (els.filesInput.files?.length) await scanFileList(els.filesInput.files, { append: true })
     els.filesInput.value = ''
   })
 
@@ -1770,53 +1797,42 @@ function bindEvents () {
   document.addEventListener('fullscreenchange', updateFullscreenButton)
 
   document.addEventListener('keydown', (event) => {
-    const target = event.target
-    if (target.closest?.('input, textarea, select, button, a, [contenteditable="true"]')) {
-      if (event.key === '/' && target.id !== 'search') {
-        event.preventDefault()
-        els.search.focus()
-      }
+    const action = resolveShortcut(event)
+    if (!action) return
+
+    // Escape only clears a search that actually has something in it; otherwise
+    // it is left to the browser (for example to leave fullscreen).
+    if (action === 'clear-search') {
+      if (!els.search.value && !state.filter) return
+      event.preventDefault()
+      clearSearch()
       return
     }
 
-    if (event.metaKey || event.ctrlKey || event.altKey) return
-
-    switch (event.key) {
-      case ' ':
-      case 'Spacebar':
-        event.preventDefault()
+    event.preventDefault()
+    switch (action) {
+      case 'playpause':
         handlePlayPause()
         break
-      case 'ArrowRight':
-        event.preventDefault()
+      case 'seek-forward':
         seekBy(5)
         break
-      case 'ArrowLeft':
-        event.preventDefault()
+      case 'seek-back':
         seekBy(-5)
         break
-      case 'n':
-      case 'N':
-        event.preventDefault()
+      case 'next':
         playNext()
         break
-      case 'p':
-      case 'P':
-        event.preventDefault()
+      case 'previous':
         previous()
         break
-      case 'm':
-      case 'M':
-        event.preventDefault()
+      case 'mute':
         toggleMute()
         break
-      case 'f':
-      case 'F':
-        event.preventDefault()
+      case 'fullscreen':
         void toggleFullscreen()
         break
-      case '/':
-        event.preventDefault()
+      case 'focus-search':
         els.search.focus()
         break
     }
@@ -1832,7 +1848,7 @@ function bindEvents () {
     target.addEventListener('drop', async (event) => {
       if (!event.dataTransfer?.files?.length) return
       event.preventDefault()
-      await scanFileList(event.dataTransfer.files)
+      await scanFileList(event.dataTransfer.files, { append: true })
     })
   }
 }
