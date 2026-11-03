@@ -12,7 +12,10 @@
 - Multi-track MP4 selectors handle tracks without ids, and the Safari-only browser limitation is documented
 - Added regression tests for LRC/ELRC parsing and pairing, CD+G keying, deflated and multi-song ZIPs, resilient scanning, audio tracks and the static server
 - The static server now serves only `index.html`, `css/`, `js/` and `assets/`, so tests, docs, `.git` and `node_modules` are no longer reachable. It listens on loopback by default; `--host`/`HOST` is an explicit opt-in for LAN access
-- Zipped libraries ignore macOS AppleDouble (`._*`) entries instead of listing them as unplayable songs, and filenames that parse to an empty artist or title (for example `Artist - [Karaoke]`) are reported as skipped instead of added as blank rows
+- Zipped libraries ignore macOS AppleDouble (`._*`) entries instead of listing them as unplayable songs, and the same files are skipped during folder scans and drag-and-drop. Filenames that parse to an empty artist or title (for example `Artist - [Karaoke]`) are reported as skipped instead of added as blank rows
+- Keyboard shortcuts keep working after a button, slider or link receives focus. Keys owned by the focused control are left alone (`Space`/`Enter` still activate buttons, arrows still adjust sliders and selects, typing in search is untouched), and `Esc` now clears the search field
+- LRC `[offset:±ms]` tags are applied in the documented direction, and Enhanced LRC inline `<mm:ss.xx>` word timings now drive word highlighting
+- **Add files** and drag-and-drop now add to the loaded library instead of replacing it; a rebuilt track replaces its old entry, and repeated scan warnings are deduplicated
 
 ## v2.0.2 (2026-02-14)
 
