@@ -81,7 +81,9 @@ Olivia Rodrigo - Drivers License.elrc   # optional word timing
 When both `.cdg` and `.lrc` are present, the CD+G version is used so its visual
 format is preserved. An `.elrc` file can be used on its own when its line headers
 provide the lyric text. Standalone `.lrc` and `.elrc` files are not playable
-tracks.
+tracks. LRC `[offset:+500]` tags are applied in the documented direction (a
+positive value makes lyrics appear sooner), and Enhanced LRC `<mm:ss.xx>` word
+timings inside a line drive word-by-word highlighting.
 
 Zipped tracks work too, as long as the audio and its companion files share a
 name:
@@ -107,6 +109,10 @@ is counted in the "files skipped during the scan" notice above the library.
 Unreadable files and corrupt archives are reported there too, and the rest of
 the scan continues.
 
+Opening a folder replaces the current library. **Add files** and drag-and-drop
+add to it instead, so extra songs can be loaded without rescanning the folder;
+a re-added track replaces its earlier entry rather than appearing twice.
+
 MP4 files with multiple audio tracks (for example vocal and instrumental) show
 an audio-track selector in browsers that expose
 `HTMLMediaElement.audioTracks`. Safari supports this API; Chromium-based
@@ -124,6 +130,12 @@ default track.
 | `M` | Mute |
 | `F` | Fullscreen |
 | `/` | Focus search |
+| `Esc` | Clear the search field |
+
+Shortcuts keep working after a control has focus, so clicking Play or a queue
+button does not disable them. Keys that belong to the focused control are left
+alone: `Space` and `Enter` still activate a focused button, arrow keys still
+adjust a slider or select, and text entry keeps its own keys.
 
 ## Development
 
@@ -143,7 +155,8 @@ The app is plain ES modules and CSS with no build or transpile step:
 | `js/player.js` | Audio/video playback, CD+G sync, LRC/ELRC loading, visualizer dispatch |
 | `js/visualizer.js` | Background visual styles, audio sampling and selection persistence |
 | `js/cdg.js` | CD+G decoder and renderer |
-| `js/lrc.js` | LRC/ELRC parsing and word-timing alignment |
+| `js/lrc.js` | LRC/ELRC parsing, word-timing alignment and `[offset]` handling |
+| `js/shortcuts.js` | Keyboard shortcut resolution and focus-aware key ownership |
 | `js/library.js` | Filename parsing, file pairing, resilient scanning, search |
 | `js/zip.js` | Minimal ZIP reader (stored + deflate) |
 | `js/audio-tags.js` | ReplayGain tag parsing |
