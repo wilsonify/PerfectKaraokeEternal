@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Reopening the library is now remembered for both the native folder picker and the directory-input fallback: `Reopen “<folder>”` restores the handle where the browser allows it, explains when the browser asks for the folder again, and reports granted, denied or unavailable access without clearing the loaded library
+- Folder scans now use paths relative to the selected folder, so opening the same folder through the picker or the directory input no longer duplicates songs or drops the saved queue; a folder that cannot be read leaves the current library intact
 - Library browsing now has media-type filter chips (CD+G, LRC, MP4, ZIP), a single keyboard tab stop with `↑`/`↓`/`Home`/`End` navigation, `Enter` to queue and `Shift+Enter` to play now, plus clear selected/current/next states in the song list
 - Every song and queue row now shows what it can play (audio format, CD+G, LRC, ELRC, ZIP, MP4), duplicate queue entries are counted, the first queued song is marked "Next", and queue duration is estimated from fast MP3 header reads
 - Skipped-file notices now group problems by cause (missing lyrics, unreadable filename, damaged archive, unreadable folder or file) and explain how to fix each one
