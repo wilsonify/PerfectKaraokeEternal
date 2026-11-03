@@ -200,9 +200,11 @@
         <p id="queue-summary" class="queue-summary" aria-live="polite" hidden></p>
         <p id="queue-empty" class="empty-state">Nothing queued yet. Pick a song from the library.</p>
         <ol id="queue-list" class="queue-list"></ol>
-        <div id="history-section" hidden>
-          <h2 class="subheading">Played</h2>
-          <ol id="history-list" class="queue-list history-list"></ol>
+        <div id="history-section" class="history-section" hidden>
+          <details class="history-collapsible">
+            <summary class="subheading">Played</summary>
+            <ol id="history-list" class="queue-list history-list"></ol>
+          </details>
         </div>
       </div>
     </section>
