@@ -53,6 +53,87 @@ function parseTxxx (bytes) {
   return { description: description.text.trim(), value }
 }
 
+function parseId3Text (bytes) {
+  if (bytes.length < 1) return ''
+
+  const encoding = bytes[0]
+  const payload = bytes.subarray(1)
+  let text = ''
+
+  try {
+    if (encoding === 1 || encoding === 2) {
+      text = new TextDecoder('utf-16le').decode(payload)
+    } else if (encoding === 3) {
+      text = new TextDecoder('utf-8').decode(payload)
+    } else {
+      text = new TextDecoder('latin1').decode(payload)
+    }
+  } catch {
+    return ''
+  }
+
+  return text.replace(/\0+$/, '').trim()
+}
+
+export function parseId3Tags (buffer) {
+  const bytes = new Uint8Array(buffer)
+  if (bytes.length < 10 || bytes[0] !== 0x49 || bytes[1] !== 0x44 || bytes[2] !== 0x33) {
+    return null
+  }
+
+  const version = bytes[3]
+  if (version < 3 || version > 4) return null
+
+  const tagSize = synchsafe(bytes.subarray(6, 10))
+  const end = Math.min(bytes.length, 10 + tagSize)
+  let offset = 10
+
+  if ((bytes[5] & 0x40) !== 0 && offset + 4 <= end) {
+    const extendedSize = version === 4
+      ? synchsafe(bytes.subarray(offset, offset + 4))
+      : readU32(bytes.subarray(offset, offset + 4)) + 4
+    offset += Math.max(extendedSize, 4)
+  }
+
+  const tags = {}
+
+  while (offset + 10 <= end) {
+    const id = String.fromCharCode(...bytes.subarray(offset, offset + 4))
+    if (id === '\0\0\0\0' || !/^[A-Z0-9]{4}$/.test(id)) break
+
+    const frameSize = version === 4
+      ? synchsafe(bytes.subarray(offset + 4, offset + 8))
+      : readU32(bytes.subarray(offset + 4, offset + 8))
+
+    if (frameSize <= 0 || offset + 10 + frameSize > end) break
+
+    const payload = bytes.subarray(offset + 10, offset + 10 + frameSize)
+    if (id === 'TPE1' || id === 'TPE2') {
+      const text = parseId3Text(payload)
+      if (text) tags.artist = text
+    }
+    if (id === 'TIT2') {
+      const text = parseId3Text(payload)
+      if (text) tags.title = text
+    }
+
+    offset += 10 + frameSize
+  }
+
+  return Object.keys(tags).length > 0 ? tags : null
+}
+
+export async function readMp3Tags (file) {
+  if (!file || !/\.mp3$/i.test(file.name ?? '')) return null
+
+  try {
+    const bytes = new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer())
+    return parseId3Tags(bytes)
+  } catch {
+    return null
+  }
+}
+
 export function parseReplayGain (buffer) {
   const bytes = new Uint8Array(buffer)
   if (bytes.length < 10 || bytes[0] !== 0x49 || bytes[1] !== 0x44 || bytes[2] !== 0x33) {
