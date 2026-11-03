@@ -29,7 +29,7 @@ The fullscreen control (`F`) SHALL request fullscreen on the stage panel, update
 
 ### Requirement: Responsive layout
 
-The two-panel layout SHALL collapse to a single column on narrow viewports (breakpoints at 1040, 860, 620 and 480 px), with transport, search and queue rows remaining reachable and no horizontal overflow down to 480 px.
+The layout SHALL use breakpoints at 1040, 860, 620 and 480 px: at 1040 px the side panel narrows and the scan status is hidden; at or below 860 px the two panels stack in a single column and the footer shortcut bar is hidden; at 620 px and 480 px the transport and queue rows wrap instead of overflowing. Search, transport and queue rows SHALL remain reachable at the narrowest breakpoint.
 
 #### Scenario: Narrow viewport
 
