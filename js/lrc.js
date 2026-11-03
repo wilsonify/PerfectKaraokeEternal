@@ -9,6 +9,7 @@
 
 const LINE_PREFIX = /^((?:\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\])+)(.*)$/
 const TIME_TAG = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g
+const INLINE_WORD_TAG = /<(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?>/g
 const METADATA = /^\[([a-zA-Z]+):(.*)\]$/
 
 function timeToSeconds (match) {
@@ -52,6 +53,71 @@ function stripBracketTags (text) {
   return output
 }
 
+function cleanLyricText (text) {
+  return stripBracketTags(text).replace(/\s+/gu, ' ').trim()
+}
+
+function wordTokens (chunk) {
+  return chunk
+    .split(/(\s+)/u)
+    .filter(token => token && !/^\s+$/u.test(token))
+}
+
+/**
+ * Read one lyric line. Enhanced LRC places `<mm:ss.xx>` before a word; the
+ * timing then applies to that word and the following untagged words until the
+ * next tag. Plain LRC has no inline tags and yields no word timings.
+ */
+function parseLyricText (raw) {
+  const tags = [...raw.matchAll(INLINE_WORD_TAG)]
+  if (tags.length === 0) return { text: cleanLyricText(raw), words: [] }
+
+  let output = ''
+  const timedWords = []
+  let currentTime = null
+  let cursor = 0
+
+  const append = (chunk) => {
+    if (!chunk) return
+    output += chunk
+    if (currentTime === null) return
+    for (const token of wordTokens(chunk)) {
+      timedWords.push({ text: token, time: currentTime })
+    }
+  }
+
+  for (const tag of tags) {
+    append(raw.slice(cursor, tag.index))
+    currentTime = timeToSeconds(tag)
+    cursor = tag.index + tag[0].length
+  }
+  append(raw.slice(cursor))
+
+  const text = cleanLyricText(output)
+  if (!text || timedWords.length === 0) return { text, words: [] }
+
+  // Align timed words to the visible tokens. This drops any tagged text that
+  // was removed by stripBracketTags and tolerates punctuation or untimed words.
+  const tokens = text.split(/\s+/u).filter(Boolean)
+  const words = []
+  let tokenIndex = 0
+
+  for (const word of timedWords) {
+    let matchIndex = -1
+    for (let index = tokenIndex; index < tokens.length; index++) {
+      if (tokens[index] === word.text) {
+        matchIndex = index
+        break
+      }
+    }
+    if (matchIndex === -1) continue
+    words.push({ text: word.text, time: word.time })
+    tokenIndex = matchIndex + 1
+  }
+
+  return { text, words }
+}
+
 function parseMetadata (line, meta) {
   const match = line.match(METADATA)
   if (!match) return false
@@ -80,11 +146,29 @@ function parseEntries (text) {
     if (!prefix) continue
 
     const tags = [...prefix[1].matchAll(TIME_TAG)]
-    const lyric = stripBracketTags(prefix[2]).replace(/\s+/gu, ' ').trim()
+    const { text: lyric, words } = parseLyricText(prefix[2])
     if (!lyric || tags.length === 0) continue
 
     for (const tag of tags) {
-      entries.push({ time: timeToSeconds(tag), text: lyric })
+      entries.push({
+        time: timeToSeconds(tag),
+        text: lyric,
+        words: words.map(word => ({ ...word })),
+      })
+    }
+  }
+
+  // `[offset:+500]` is milliseconds and a positive value makes lyrics appear
+  // sooner, so it is subtracted from every line and word timestamp. The tag is
+  // read after the lines so its position in the file does not matter.
+  const offsetMs = Number.parseFloat(meta.offset)
+  if (Number.isFinite(offsetMs) && offsetMs !== 0) {
+    const offset = offsetMs / 1000
+    for (const entry of entries) {
+      entry.time = Math.max(0, entry.time - offset)
+      for (const word of entry.words ?? []) {
+        word.time = Math.max(0, word.time - offset)
+      }
     }
   }
 
@@ -96,7 +180,11 @@ function parseEntries (text) {
 export function parseLrc (text) {
   const { entries, meta } = parseEntries(text)
   return {
-    lines: entries.map(entry => ({ time: entry.time, text: entry.text, words: [] })),
+    lines: entries.map(entry => ({
+      time: entry.time,
+      text: entry.text,
+      words: entry.words ?? [],
+    })),
     meta,
   }
 }
@@ -171,7 +259,14 @@ function attachWordTimings (lines, entries) {
   }
 
   for (let index = 0; index < lines.length; index++) {
-    lines[index].words = alignWordsToLine(lines[index].text, lineEntries[index])
+    const inline = lineEntries[index].find(entry => entry.words?.length)
+    if (inline) {
+      lines[index].words = inline.words.map(word => ({ ...word }))
+      continue
+    }
+
+    const words = alignWordsToLine(lines[index].text, lineEntries[index])
+    if (words.length > 0) lines[index].words = words
   }
 
   return lines
@@ -213,11 +308,17 @@ function inferElrcLines (entries) {
       lines.push({
         time: header.time,
         text: header.text,
-        words: alignWordsToLine(header.text, [header, ...wordEntries]),
+        words: header.words?.length
+          ? header.words.map(word => ({ ...word }))
+          : alignWordsToLine(header.text, [header, ...wordEntries]),
       })
       index = cursor
     } else {
-      lines.push({ time: header.time, text: header.text, words: [] })
+      lines.push({
+        time: header.time,
+        text: header.text,
+        words: header.words?.length ? header.words.map(word => ({ ...word })) : [],
+      })
       index++
     }
   }
@@ -241,7 +342,10 @@ export function parseLyrics ({ lrcText = null, elrcText = null } = {}) {
   const meta = { ...elrc.meta, ...lrc.meta }
 
   if (lrc.lines.length > 0) {
-    const lines = lrc.lines.map(line => ({ ...line, words: [] }))
+    const lines = lrc.lines.map(line => ({
+      ...line,
+      words: (line.words ?? []).map(word => ({ ...word })),
+    }))
     if (elrcText) {
       const { entries } = parseEntries(elrcText)
       attachWordTimings(lines, entries)
