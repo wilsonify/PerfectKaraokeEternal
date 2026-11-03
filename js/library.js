@@ -178,6 +178,40 @@ function makeId (path) {
   return path.replace(/\\/g, '/').toLowerCase()
 }
 
+/** Sort tracks consistently for the library, regardless of scan order. */
+export function sortTracks (tracks) {
+  return tracks.sort((a, b) =>
+    collator.compare(a.artistNorm, b.artistNorm)
+    || collator.compare(a.titleNorm, b.titleNorm)
+    || collator.compare(a.path, b.path),
+  )
+}
+
+/**
+ * Add newly scanned tracks to an existing library. A track with the same id is
+ * replaced, so re-adding an updated file does not create a duplicate row.
+ */
+export function mergeTracks (existing, incoming) {
+  const incomingIds = new Set(incoming.map(track => track.id))
+  const kept = existing.filter(track => !incomingIds.has(track.id))
+  return sortTracks([...kept, ...incoming])
+}
+
+/** Combine scan warnings without showing the same path/reason twice. */
+export function mergeWarnings (existing, incoming) {
+  const seen = new Set()
+  const merged = []
+
+  for (const warning of [...existing, ...incoming]) {
+    const key = `${warning.path}\u0000${warning.reason}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(warning)
+  }
+
+  return merged
+}
+
 function makeTrack (fields) {
   const track = {
     duration: null,
@@ -361,6 +395,10 @@ export async function buildLibrary (records, { onProgress } = {}) {
   const seen = new Set()
   const candidates = records.filter((record) => {
     if (!SUPPORTED_EXTENSIONS.includes(getExtension(record.file.name))) return false
+    // macOS AppleDouble files share the real file's extension but are not
+    // playable media. Skip them for drag-and-drop and the folder fallback too,
+    // not just inside ZIP archives.
+    if (fileName(record.path).startsWith('._')) return false
     if (seen.has(record.path)) return false
     seen.add(record.path)
     return true
@@ -487,14 +525,8 @@ export async function buildLibrary (records, { onProgress } = {}) {
     }
   }
 
-  tracks.sort((a, b) =>
-    collator.compare(a.artistNorm, b.artistNorm)
-    || collator.compare(a.titleNorm, b.titleNorm)
-    || collator.compare(a.path, b.path),
-  )
-
   report('Done')
-  return { tracks, warnings }
+  return { tracks: sortTracks(tracks), warnings }
 }
 
 /**
@@ -530,6 +562,7 @@ export async function collectDirectoryRecords (directory, { onEntry } = {}) {
         await walk(entry, `${path}/`)
       } else if (entry.kind === 'file') {
         if (!SUPPORTED_EXTENSIONS.includes(getExtension(entry.name))) continue
+        if (entry.name.startsWith('._')) continue
         scanned++
         try {
           records.push({ file: await entry.getFile(), path })
