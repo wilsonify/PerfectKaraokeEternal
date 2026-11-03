@@ -8,7 +8,7 @@ Describe discovery, parsing and synchronized display of LRC and Enhanced LRC (EL
 
 ### Requirement: Lyric companion discovery
 
-Audio files SHALL pair with a same-named `.lrc` and optional `.elrc` companion in the same folder or inside a ZIP, matched case-insensitively. When a CD+G companion also exists, CD+G wins and the LRC files are not separate tracks. An `.elrc` with usable line headers MAY stand alone as its own track; an `.elrc` without usable headers SHALL NOT create a track.
+Audio files SHALL pair with a same-named `.lrc` and optional `.elrc` companion in the same folder or inside a ZIP, matched case-insensitively. When a CD+G companion also exists, CD+G wins and the LRC files are not separate tracks. An audio file MAY rely on only an `.elrc` companion (no `.lrc`), but only when that `.elrc` has usable line headers; an `.elrc` with no usable headers SHALL NOT be paired and SHALL be counted as skipped. A lyric file never becomes a track on its own.
 
 #### Scenario: LRC with optional ELRC
 
