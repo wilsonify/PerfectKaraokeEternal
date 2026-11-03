@@ -1,194 +1,95 @@
 # Perfect Karaoke
 
-A local karaoke player with support for MP3+G (CD+G), synchronized LRC/ELRC lyrics, and MP4
-files. 
+A local karaoke player for MP3+G (CD+G), audio with synchronized LRC/ELRC lyrics, zipped songs, and
+MP4 karaoke videos. Open a folder of songs in your browser, build a queue, and sing.
 
-Open a folder of songs in your browser, build a queue, and sing.
-
-Everything runs in the browser: there is no application backend, no accounts, no uploads, and no build step.
+Everything runs in the browser: no backend, no accounts, no uploads, no build step. Your music never
+leaves your computer.
 
 ![Perfect Karaoke player](assets/screenshot.png)
 
-## Features
-
-- MP3+G tracks (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac` with a matching `.cdg`)
-- Audio with synchronized `.lrc` lyrics and optional `.elrc` word timing
-- Zipped MP3+G or LRC songs, including archives with several songs or extra files
-- MP4 karaoke videos, with an audio-track selector when the browser exposes multiple MP4 tracks (currently Safari; Chromium-based browsers and Firefox play the default track)
-- CD+G and LRC lyrics rendering with adjustable size and background dimming
-- Current-line highlighting, ELRC word timing, automatic scrolling and click-to-seek for LRC lyrics
-- Selectable audio-reactive background visuals behind the lyrics, remembered between visits (Classic, Hot Pink, Spectrum, Waveform, Aurora, Pulse, Starfield, Minimal, or Off)
-- Library grouped by artist with normalized artist names, alphabet jump, favourites, search and media-type filters
-- Clear media badges on every song and queue row (MP3/other audio, CD+G, LRC, ELRC, ZIP, MP4), plus a "Next" marker for the first queued song
-- Queue with drag-and-drop or button reordering, move-to-front, duplicate counts, history, "play now" and duration estimates
-- Library diagnostics that group skipped files by cause and explain how to fix each one
-- One keyboard tab stop for the whole song list, with arrow-key browsing, `Enter` to queue and `Shift+Enter` to play now
-- Optional ReplayGain volume leveling
-- Keyboard shortcuts, fullscreen, and remembered volume/display settings
-- Your library never leaves the computer - files are read locally by the browser
-
-## Requirements
-
-- [Node.js](https://nodejs.org/) 20 or newer, used only to serve the static files
-- A modern browser. Chrome or Edge are recommended because they support the
-  File System Access API, which lets the player remember your music folder between
-  visits. Other browsers can still load songs with **Add files** or drag-and-drop.
-
-## Running
+## Quick start
 
 ```bash
 npm start
 ```
 
-Then open <http://localhost:3000>. No `npm install` is needed: the app has no
-runtime dependencies, and `serve.js` uses only Node's standard library.
-
-To use another port:
+Open <http://localhost:3000>, choose **Open music folder**, and pick the folder that holds your
+songs. Node.js 20+ is required, but no `npm install` is needed to run the player.
 
 ```bash
-node serve.js --port 8080
-# or
-PORT=8080 npm start
+node serve.js --port 8080        # another port
+node serve.js --host 0.0.0.0     # reachable from your LAN (no authentication)
 ```
 
-The server listens on `127.0.0.1` only and serves just the player's own files
-(`index.html`, `css/`, `js/` and `assets/`), so the rest of the repository is not
-reachable. To open the player from another device on the same network, opt in
-explicitly:
+The server listens on `127.0.0.1` only by default and serves only the app's own files — never your
+music, tests, or repository metadata. Opening `index.html` from disk does not work; the app must be
+served over HTTP.
 
-```bash
-node serve.js --host 0.0.0.0
-# or
-HOST=0.0.0.0 npm start
-```
+## What you can play
 
-There is no authentication, so only do that on a network you trust.
-
-Opening `index.html` straight from disk does not work, because browsers refuse to
-load ES modules over `file://`.
-
-## Song files
-
-Name audio and lyric files the same way in the same folder. Audio can use a
-CD+G file, an LRC file, or both:
-
-```text
-Queen - Bohemian Rhapsody.mp3
-Queen - Bohemian Rhapsody.cdg
-
-Olivia Rodrigo - Drivers License.mp3
-Olivia Rodrigo - Drivers License.lrc
-Olivia Rodrigo - Drivers License.elrc   # optional word timing
-```
-
-When both `.cdg` and `.lrc` are present, the CD+G version is used so its visual
-format is preserved. An `.elrc` file can be used on its own when its line headers
-provide the lyric text. Standalone `.lrc` and `.elrc` files are not playable
-tracks. LRC `[offset:+500]` tags are applied in the documented direction (a
-positive value makes lyrics appear sooner), and Enhanced LRC `<mm:ss.xx>` word
-timings inside a line drive word-by-word highlighting.
-
-Zipped tracks work too, as long as the audio and its companion files share a
-name:
-
-```text
-Queen - BoRhap.zip
-  Queen - BoRhap.mp3
-  Queen - BoRhap.cdg
-
-Olivia Rodrigo - Drivers License.zip
-  Olivia Rodrigo - Drivers License.mp3
-  Olivia Rodrigo - Drivers License.lrc
-  Olivia Rodrigo - Drivers License.elrc
-```
-
-The filename parser understands the naming conventions karaoke libraries tend to
-use: `The`-article handling (`Beatles, The`), track numbers (`AZ1234-01 - ...`),
-`ft.`/`feat.` variants, `[Karaoke]`-style suffixes, and `in the style of ...` titles.
-
-Files that cannot be used are not silently dropped: anything without a matching
-`.cdg`, `.lrc`, or `.elrc`, or without an `Artist - Title` separator in the name,
-is counted in the "files skipped during the scan" notice above the library. Open
-the notice to see each cause (missing lyrics, unreadable filename, damaged ZIP,
-unreadable folder or file) with the affected paths and a suggested fix. Unreadable
-files and corrupt archives are reported there too, and the rest of the scan
-continues.
-
-Opening a folder replaces the current library. **Add files** and drag-and-drop
-add to it instead, so extra songs can be loaded without rescanning the folder;
-a re-added track replaces its earlier entry rather than appearing twice.
-
-MP4 files with multiple audio tracks (for example vocal and instrumental) show
-an audio-track selector in browsers that expose
-`HTMLMediaElement.audioTracks`. Safari supports this API; Chromium-based
-browsers and Firefox currently ship it disabled, so they play the file's
-default track.
-
-## Keyboard shortcuts
-
-| Key | Action |
+| Library | Files |
 | --- | --- |
-| `Space` | Play / pause |
-| `←` / `→` | Seek 5 seconds |
-| `N` | Next song |
-| `P` | Previous song |
-| `M` | Mute |
-| `F` | Fullscreen |
-| `/` | Focus search |
-| `↑` / `↓` | Move through the song list |
-| `Home` / `End` | First or last song in the list |
-| `Enter` | Queue the focused song |
-| `Shift` + `Enter` | Play the focused song now |
-| `Esc` | Clear the search field |
+| MP3+G | Audio (`.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`) plus a same-name `.cdg` |
+| LRC lyrics | Audio plus a same-name `.lrc`, with optional `.elrc` word timing |
+| Zipped songs | `.zip` archives containing those pairs, including multi-song albums |
+| Karaoke video | `.mp4` files named `Artist - Title.mp4` |
 
-Shortcuts keep working after a control has focus, so clicking Play or a queue
-button does not disable them. Keys that belong to the focused control are left
-alone: `Space` and `Enter` still activate a focused button, arrow keys still
-adjust a slider or select, and text entry keeps its own keys.
+Audio and companions must share a base name in the same folder; CD+G wins when both CD+G and LRC
+exist. Files that cannot be used are grouped in a skipped-files notice with a suggested fix instead
+of being silently dropped. The full rules are in the [user guide](docs/USER_GUIDE.md).
+
+## Features
+
+- Library grouped by artist, with normalized names, alphabet jump, favourites, search, and
+  media-type filters
+- Media badges on every song and queue row, duplicate counts, a **Next** marker, and queue duration
+  estimates
+- Queue reordering (drag or buttons), move to front, play now, clear, and played history
+- CD+G and LRC/ELRC lyrics with adjustable size, dimming, and click-to-seek
+- Nine background visual styles that react to the music, remembered between visits
+- Optional ReplayGain leveling
+- MP4 audio-track selector where the browser exposes multiple tracks
+- Keyboard shortcuts, fullscreen, and remembered volume and display settings
+- Library restoration that remembers your folder where the browser allows it
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [Documentation index](docs/README.md) | Choose a guide by audience and task |
+| [User guide](docs/USER_GUIDE.md) | Installing, organizing a library, queueing, playback, mobile use |
+| [Administrator guide](docs/ADMIN_GUIDE.md) | Hosting, ports and binding, LAN exposure, security, backup, updates |
+| [Developer guide](docs/DEVELOPER_GUIDE.md) | Architecture, module responsibilities, tests, debugging |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Symptom-based fixes |
+| [Contributing](docs/CONTRIBUTING.md) | OpenSpec workflow, verification, changelog, docs rules |
+| [Changelog](docs/CHANGELOG.md) | Release history |
+| [Archive](docs/archive/README.md) | Historical QA, UX, and upstream-issue reports |
+
+Specifications of observable behavior live in [`openspec/specs/`](openspec/specs/) and are the
+authoritative contract for what the app does.
 
 ## Development
 
 ```bash
-npm install    # dev tools only (ESLint, OpenSpec CLI)
+npm install    # development tools only: ESLint and the OpenSpec CLI
 npm test       # node:test suite
 npm run lint   # ESLint
 ```
 
-Specifications of observable behavior live in [`openspec/specs/`](openspec/specs/);
-the workflow for changing them is in
-[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md), and the documentation index is
-[docs/README.md](docs/README.md).
+The app is plain ES modules and CSS with no transpile or bundle step. See the
+[developer guide](docs/DEVELOPER_GUIDE.md) for the architecture and the
+[contribution workflow](docs/CONTRIBUTING.md) for changing behavior.
 
-The app is plain ES modules and CSS with no build or transpile step:
+## Browser requirements
 
-| Path | Contents |
-| --- | --- |
-| `index.html` | Markup and icon sprite |
-| `css/app.css` | Layout, theme and responsive rules |
-| `js/app.js` | UI state, library browsing, queue, persistence |
-| `js/player.js` | Audio/video playback, CD+G sync, LRC/ELRC loading, visualizer dispatch |
-| `js/visualizer.js` | Background visual styles, audio sampling and selection persistence |
-| `js/cdg.js` | CD+G decoder and renderer |
-| `js/lrc.js` | LRC/ELRC parsing, word-timing alignment and `[offset]` handling |
-| `js/shortcuts.js` | Keyboard shortcut resolution and focus-aware key ownership |
-| `js/library.js` | Filename parsing, file pairing, resilient scanning, diagnostics, media badges and search |
-| `js/audio-duration.js` | Fast MP3 duration estimates from Xing headers or the first frame |
-| `js/zip.js` | Minimal ZIP reader (stored + deflate) |
-| `js/audio-tags.js` | ReplayGain tag parsing |
-| `js/audio-tracks.js` | Multi-track MP4 audio switching (browser permitting) |
-| `serve.js` | Static file server for development and local use |
-| `test/` | Unit tests for parsing, pairing, ZIP reading, scanning, diagnostics, duration estimates, CD+G, LRC/ELRC, ReplayGain, audio tracks and the server, plus short real MP3+G excerpts in `test/fixtures/media/` |
+Chrome or Edge is recommended: it supports the File System Access API, so the player can remember
+your music folder and reopen it without browsing again. Firefox, Safari, and embedded browsers can
+still load songs with **Add files**, drag-and-drop, or the directory input, but ask for the folder
+again on later visits. The native folder picker also requires a secure context (`http://localhost`
+or `https://`).
 
-See [docs/README.md](docs/README.md) for the documentation index and current
-specifications.
+## License
 
-See [docs/UX_IMPROVEMENT_REPORT.md](docs/UX_IMPROVEMENT_REPORT.md) for the
-usability audit, the changes made and how they were verified.
-
-See [docs/UPSTREAM_ISSUE_ROADMAP.md](docs/UPSTREAM_ISSUE_ROADMAP.md) for the
-complete audit of upstream KaraokeEternal issues and the remaining work.
-
-## Licence
-
-ISC. The CD+G decoder is adapted from [cdgraphics](https://github.com/bhj/cdgraphics)
-by Ben Hilburn (ISC).
+ISC. The CD+G decoder is adapted from [cdgraphics](https://github.com/bhj/cdgraphics) by Ben Hilburn
+(ISC).
