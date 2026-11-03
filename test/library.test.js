@@ -4,13 +4,18 @@ import { deflateRawSync } from 'node:zlib'
 import {
   buildLibrary,
   collectDirectoryRecords,
+  diagnoseWarnings,
   formatDuration,
+  formatQueueDuration,
   formatSize,
   groupByArtist,
+  matchesMediaFilter,
   mergeTracks,
   mergeWarnings,
   parseTrackName,
   searchTracks,
+  summarizeDurations,
+  trackMedia,
 } from '../js/library.js'
 import { readZipDirectory, readZipEntry } from '../js/zip.js'
 import { trackNameCases } from './fixtures/track-names.js'
@@ -257,6 +262,114 @@ test('formatDuration and formatSize render display values', () => {
   assert.equal(formatSize(0), '')
   assert.equal(formatSize(1536), '2 KB')
   assert.equal(formatSize(5 * 1024 * 1024), '5.0 MB')
+})
+
+test('groupByArtist merges alternate spellings of the same artist', () => {
+  const artists = groupByArtist([
+    { artist: 'The Beatles', artistNorm: 'Beatles', artistKey: 'beatles', title: 'Help' },
+    { artist: 'Beatles, The', artistNorm: 'Beatles', artistKey: 'beatles', title: 'Hey Jude' },
+    { artist: 'Queen', artistNorm: 'Queen', artistKey: 'queen', title: 'Killer Queen' },
+  ])
+
+  assert.equal(artists.size, 2)
+  assert.deepEqual(artists.get('The Beatles').map(track => track.title), ['Help', 'Hey Jude'])
+})
+
+test('trackMedia describes the formats a song can actually play', () => {
+  const cdg = trackMedia({
+    kind: 'cdg',
+    path: 'Artist - Song.mp3',
+    sourceName: 'Artist - Song.mp3',
+  })
+  assert.deepEqual(cdg.map(item => item.label), ['MP3', 'CD+G'])
+
+  const lrc = trackMedia({
+    kind: 'lrc',
+    path: 'Artist - Song.mp3',
+    sourceName: 'Artist - Song.mp3',
+    lrcFile: {},
+    elrcFile: {},
+  })
+  assert.deepEqual(lrc.map(item => item.label), ['MP3', 'LRC', 'ELRC'])
+
+  const elrcOnly = trackMedia({
+    kind: 'lrc',
+    path: 'Artist - Song.mp3',
+    sourceName: 'Artist - Song.mp3',
+    elrcFile: {},
+  })
+  assert.deepEqual(elrcOnly.map(item => item.label), ['MP3', 'ELRC'])
+
+  const zip = trackMedia({
+    kind: 'zip',
+    path: 'Album.zip',
+    sourceName: 'Folder/Song.mp3',
+  })
+  assert.deepEqual(zip.map(item => item.label), ['ZIP', 'MP3', 'CD+G'])
+
+  const video = trackMedia({ kind: 'mp4', path: 'Song.mp4', sourceName: 'Song.mp4' })
+  assert.deepEqual(video.map(item => item.label), ['MP4'])
+
+  assert.deepEqual(trackMedia(null), [])
+})
+
+test('matchesMediaFilter selects compatible songs', () => {
+  const cdg = { kind: 'cdg' }
+  const lrc = { kind: 'lrc' }
+  const zipLrc = { kind: 'zip-lrc' }
+  const zip = { kind: 'zip' }
+  const mp4 = { kind: 'mp4' }
+
+  assert.equal(matchesMediaFilter(cdg, 'all'), true)
+  assert.equal(matchesMediaFilter(cdg, 'cdg'), true)
+  assert.equal(matchesMediaFilter(lrc, 'cdg'), false)
+  assert.equal(matchesMediaFilter(lrc, 'lyrics'), true)
+  assert.equal(matchesMediaFilter(zipLrc, 'lyrics'), true)
+  assert.equal(matchesMediaFilter(zip, 'zip'), true)
+  assert.equal(matchesMediaFilter(zipLrc, 'zip'), true)
+  assert.equal(matchesMediaFilter(mp4, 'video'), true)
+  assert.equal(matchesMediaFilter(mp4, 'cdg'), false)
+})
+
+test('diagnoseWarnings explains why files were skipped', () => {
+  const report = diagnoseWarnings([
+    { path: 'A - One.mp3', reason: 'missing .cdg or .lrc file' },
+    { path: 'B - Two.mp3', reason: 'missing .cdg or .lrc file' },
+    { path: 'loose.mp3', reason: 'could not determine artist and title from filename' },
+    { path: 'Archive.zip!/Song.mp3', reason: 'missing .cdg or .lrc file' },
+  ])
+
+  assert.equal(report.total, 4)
+  assert.equal(report.groups[0].category, 'No lyrics or CD+G')
+  assert.equal(report.groups[0].items.length, 3)
+  assert.match(report.groups[0].hint, /Add a \.cdg, \.lrc, or \.elrc/)
+
+  const archiveItem = report.groups[0].items.find(item => item.path.includes('!/'))
+  assert.equal(archiveItem.displayPath, 'Archive.zip → Song.mp3')
+
+  const nameGroup = report.groups.find(group => group.id === 'unreadable-name')
+  assert.equal(nameGroup.items.length, 1)
+  assert.match(nameGroup.hint, /Artist - Title/)
+})
+
+test('summarizeDurations and formatQueueDuration estimate queue length', () => {
+  assert.deepEqual(
+    summarizeDurations([
+      { duration: 120 },
+      { duration: 60.5 },
+      { duration: null },
+      { duration: 0 },
+    ]),
+    { seconds: 180.5, known: 2, unknown: 2, total: 4, estimated: false },
+  )
+  assert.deepEqual(summarizeDurations(null), { seconds: 0, known: 0, unknown: 0, total: 0, estimated: false })
+
+  assert.equal(formatQueueDuration(10), '<1 min')
+  assert.equal(formatQueueDuration(90), '2 min')
+  assert.equal(formatQueueDuration(3600), '1 hr')
+  assert.equal(formatQueueDuration(3900), '1 hr 5 min')
+  assert.equal(formatQueueDuration(0), '')
+  assert.equal(formatQueueDuration(Number.NaN), '')
 })
 
 test('buildLibrary creates one track per song in multi-song zips', async () => {
