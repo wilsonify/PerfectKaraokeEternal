@@ -149,10 +149,15 @@ adjust a slider or select, and text entry keeps its own keys.
 ## Development
 
 ```bash
-npm install    # dev tools only (ESLint)
+npm install    # dev tools only (ESLint, OpenSpec CLI)
 npm test       # node:test suite
 npm run lint   # ESLint
 ```
+
+Specifications of observable behavior live in [`openspec/specs/`](openspec/specs/);
+the workflow for changing them is in
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md), and the documentation index is
+[docs/README.md](docs/README.md).
 
 The app is plain ES modules and CSS with no build or transpile step:
 
@@ -174,8 +179,11 @@ The app is plain ES modules and CSS with no build or transpile step:
 | `serve.js` | Static file server for development and local use |
 | `test/` | Unit tests for parsing, pairing, ZIP reading, scanning, diagnostics, duration estimates, CD+G, LRC/ELRC, ReplayGain, audio tracks and the server, plus short real MP3+G excerpts in `test/fixtures/media/` |
 
-See [UX_IMPROVEMENT_REPORT.md](UX_IMPROVEMENT_REPORT.md) for the usability audit,
-the changes made and how they were verified.
+See [docs/README.md](docs/README.md) for the documentation index and current
+specifications.
+
+See [docs/UX_IMPROVEMENT_REPORT.md](docs/UX_IMPROVEMENT_REPORT.md) for the
+usability audit, the changes made and how they were verified.
 
 See [docs/UPSTREAM_ISSUE_ROADMAP.md](docs/UPSTREAM_ISSUE_ROADMAP.md) for the
 complete audit of upstream KaraokeEternal issues and the remaining work.
