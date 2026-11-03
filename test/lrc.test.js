@@ -139,3 +139,81 @@ test('ELRC-only files without usable line headers produce no lyrics', () => {
   assert.deepEqual(parseElrc('[ar:No Lyrics]').lines, [])
   assert.deepEqual(parseLyrics({ lrcText: '', elrcText: '' }).lines, [])
 })
+
+test('parseLrc applies the global offset tag in the documented direction', () => {
+  const earlier = parseLrc([
+    '[offset:+500]',
+    '[00:10.00]Soon',
+    '[00:00.20]At the start',
+  ].join('\n'))
+  assert.deepEqual(earlier.lines.map(line => [line.time, line.text]), [
+    [0, 'At the start'],
+    [9.5, 'Soon'],
+  ])
+
+  const later = parseLrc('[00:10.00]Later\n[offset:-250]\n')
+  assert.equal(later.lines[0].time, 10.25)
+  assert.equal(later.meta.offset, '-250')
+})
+
+test('an offset after the lyric lines still applies', () => {
+  const result = parseLrc('[00:05.00]Line\n[offset:+1000]\n')
+  assert.equal(result.lines[0].time, 4)
+})
+
+test('parseLrc reads enhanced inline word timings', () => {
+  const result = parseLrc('[00:10.00]<00:10.00>Hello <00:10.40>brave new <00:11.00>world')
+
+  assert.equal(result.lines[0].text, 'Hello brave new world')
+  assert.deepEqual(result.lines[0].words, [
+    { text: 'Hello', time: 10 },
+    { text: 'brave', time: 10.4 },
+    { text: 'new', time: 10.4 },
+    { text: 'world', time: 11 },
+  ])
+})
+
+test('inline word timings follow the file offset', () => {
+  const result = parseLrc([
+    '[offset:+500]',
+    '[00:01.00]<00:01.00>Hello <00:01.50>world',
+  ].join('\n'))
+
+  assert.equal(result.lines[0].time, 0.5)
+  assert.deepEqual(result.lines[0].words.map(word => [word.text, word.time]), [
+    ['Hello', 0.5],
+    ['world', 1],
+  ])
+})
+
+test('parseElrc infers lines from enhanced inline timings', () => {
+  const result = parseElrc([
+    '[00:01.00]<00:01.00>Hello <00:01.40>brave world',
+    '[00:04.00]<00:04.00>Next line',
+  ].join('\n'))
+
+  assert.deepEqual(result.lines.map(line => line.text), ['Hello brave world', 'Next line'])
+  assert.deepEqual(result.lines[0].words.map(word => [word.text, word.time]), [
+    ['Hello', 1],
+    ['brave', 1.4],
+    ['world', 1.4],
+  ])
+})
+
+test('inline word timings are used as a fallback when ELRC has no words', () => {
+  const result = parseLyrics({
+    lrcText: '[00:01.00]<00:01.00>Hello <00:01.40>world',
+    elrcText: '[00:01.00]Hello world',
+  })
+
+  assert.deepEqual(result.lines[0].words.map(word => [word.text, word.time]), [
+    ['Hello', 1],
+    ['world', 1.4],
+  ])
+})
+
+test('inline word tags are removed from lyric text when no words align', () => {
+  const result = parseLrc('[00:01.00]Hello <not a timestamp> world')
+  assert.equal(result.lines[0].text, 'Hello <not a timestamp> world')
+  assert.deepEqual(result.lines[0].words, [])
+})
