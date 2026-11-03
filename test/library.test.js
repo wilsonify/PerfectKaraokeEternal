@@ -147,7 +147,7 @@ test('parseTrackName strips a trailing karaoke suffix from the title', () => {
 
 test('buildLibrary prefers MP3 artist metadata over a numbered filename prefix', async () => {
   const artist = 'Green Day'
-  const title = "Adam's Song"
+  const title = 'Adam\'s Song'
   const tags = mp3WithId3Tags({ artist, title })
   const { tracks, warnings } = await buildLibrary([
     { file: file('01 - Adam\'s Song.mp3', tags), path: '01 - Adam\'s Song.mp3' },
@@ -158,6 +158,75 @@ test('buildLibrary prefers MP3 artist metadata over a numbered filename prefix',
   assert.equal(tracks.length, 1)
   assert.equal(tracks[0].artist, artist)
   assert.equal(tracks[0].title, title)
+})
+
+test('buildLibrary takes a karaoke variant\'s artist and title from its source file', async () => {
+  const artist = 'Eve 6'
+  const title = 'Inside Out'
+  const tags = mp3WithId3Tags({ artist, title })
+  const lrc = new TextEncoder().encode('[00:12.34]Hello world\n')
+
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('01 - Inside Out.mp3', tags), path: '01 - Inside Out.mp3' },
+    { file: file('01 - Inside Out - Karaoke.mp3'), path: '01 - Inside Out - Karaoke.mp3' },
+    { file: file('01 - Inside Out.lrc', lrc), path: '01 - Inside Out.lrc' },
+  ])
+
+  assert.equal(warnings.length, 0)
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].path, '01 - Inside Out - Karaoke.mp3')
+  assert.equal(tracks[0].kind, 'lrc')
+  assert.equal(tracks[0].artist, artist)
+  assert.equal(tracks[0].title, title)
+})
+
+test('buildLibrary still skips a karaoke variant when nothing identifies it', async () => {
+  const lrc = new TextEncoder().encode('[00:12.34]Hello world\n')
+
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('01 - Song.mp3'), path: '01 - Song.mp3' },
+    { file: file('01 - Song - Karaoke.mp3'), path: '01 - Song - Karaoke.mp3' },
+    { file: file('01 - Song.lrc', lrc), path: '01 - Song.lrc' },
+  ])
+
+  assert.equal(tracks.length, 0)
+  assert.deepEqual(warnings, [
+    { path: '01 - Song - Karaoke.mp3', reason: 'could not determine artist and title from filename' },
+  ])
+})
+
+test('buildLibrary reads the artist from a numbered song folder', async () => {
+  const lrc = new TextEncoder().encode('[00:12.34]Hello world\n')
+
+  const { tracks, warnings } = await buildLibrary([
+    {
+      file: file('01 - Inside Out - Karaoke.mp3'),
+      path: '01 - Eve 6 - Inside Out/01 - Inside Out - Karaoke.mp3',
+    },
+    { file: file('01 - Inside Out.lrc', lrc), path: '01 - Eve 6 - Inside Out/01 - Inside Out.lrc' },
+  ])
+
+  assert.equal(warnings.length, 0)
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].artist, 'Eve 6')
+  assert.equal(tracks[0].title, 'Inside Out')
+})
+
+test('buildLibrary ignores a numbered folder whose title is not the song', async () => {
+  const lrc = new TextEncoder().encode('[00:12.34]Hello world\n')
+
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('01 - Song.mp3'), path: '01 - Various - 90s Hits/01 - Song.mp3' },
+    { file: file('01 - Song.lrc', lrc), path: '01 - Various - 90s Hits/01 - Song.lrc' },
+  ])
+
+  assert.equal(tracks.length, 0)
+  assert.deepEqual(warnings, [
+    {
+      path: '01 - Various - 90s Hits/01 - Song.mp3',
+      reason: 'could not determine artist and title from filename',
+    },
+  ])
 })
 
 test('parseTrackName rejects names without an artist/title delimiter', () => {
