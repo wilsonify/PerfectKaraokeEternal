@@ -268,10 +268,10 @@ Ordered by value, risk and cost rather than upstream issue age.
 
 ### Phase 1 — Core usability and verification (next)
 
-1. **Investigate #55 with real CD+G media** (P2, **done 2026-10-29**). Reproduced with a purpose-built CD+G whose lyric area grows: backdrop bounds track `contentBounds` + 10 px across pause, seek and resize, and a decoder regression test now locks growth and reset in. See `docs/QA_REPORT_2026-10-29.md` §3 (#55). Residual: the upstream reporter's original browser-specific paint bug was never confirmed and remains unreproduced.
+1. **Investigate #55 with real CD+G media** (P2, **done 2026-10-29**). Reproduced with a purpose-built CD+G whose lyric area grows: backdrop bounds track `contentBounds` + 10 px across pause, seek and resize, and a decoder regression test now locks growth and reset in. See `docs/archive/QA_REPORT_2026-10-29.md` §3 (#55). Residual: the upstream reporter's original browser-specific paint bug was never confirmed and remains unreproduced.
 2. **Run a browser playback matrix** (P2). Chrome/Edge, Firefox and Safari; open a folder, load MP3+G, pause/resume, seek backwards, let a track end, repeat the same track, and leave a long track playing. Acceptance: no console errors, no stale lyrics after seek, no growing blob URLs, audio remains the timing source. Current automated evidence is Chromium only.
 3. **Validate #79 on Safari** (P2). Use a real MP4 with two labelled audio tracks. Acceptance criteria are in section 5. If Safari also hides the tracks for the test file, document the exact container/track requirement and keep the selector hidden.
-4. **Static-server hardening (done 2026-10-29).** The server now serves only `index.html`, `css/`, `js/` and `assets/`; `.git`, tests, docs and `node_modules` return 404. It binds to `127.0.0.1` by default, and `--host`/`HOST` is an explicit opt-in for LAN access. Covered by `test/serve.test.js` and recorded in `docs/QA_REPORT_2026-10-29.md`.
+4. **Static-server hardening (done 2026-10-29).** The server now serves only `index.html`, `css/`, `js/` and `assets/`; `.git`, tests, docs and `node_modules` return 404. It binds to `127.0.0.1` by default, and `--host`/`HOST` is an explicit opt-in for LAN access. Covered by `test/serve.test.js` and recorded in `docs/archive/QA_REPORT_2026-10-29.md`.
 
 ### Phase 2 — Worthwhile features consistent with scope
 
@@ -305,7 +305,7 @@ curl http://127.0.0.1:4173/js/player.js     -> 200 text/javascript
 curl -I <fixture>                            -> 200
 ```
 
-> This verification snapshot is from the 2026-10-28 audit. After the follow-up QA pass on 2026-10-29 the suite had 72 tests (see `docs/QA_REPORT_2026-10-29.md` for that review's results and remaining manual checks); the suite has since grown to 110 tests. The live count is tracked in `docs/README.md`.
+> This verification snapshot is from the 2026-10-28 audit. After the follow-up QA pass on 2026-10-29 the suite had 72 tests (see `docs/archive/QA_REPORT_2026-10-29.md` for that review's results and remaining manual checks); the suite has since grown to 110 tests. The live count is tracked in `docs/README.md`.
 
 ### Browser checks (Chromium, Windows)
 
