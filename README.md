@@ -18,8 +18,11 @@ Everything runs in the browser: there is no application backend, no accounts, no
 - CD+G and LRC lyrics rendering with adjustable size and background dimming
 - Current-line highlighting, ELRC word timing, automatic scrolling and click-to-seek for LRC lyrics
 - Selectable audio-reactive background visuals behind the lyrics, remembered between visits (Classic, Hot Pink, Spectrum, Waveform, Aurora, Pulse, Starfield, Minimal, or Off)
-- Library grouped by artist with alphabet jump, favourites and search
-- Queue with drag-and-drop reordering, history and "play now"
+- Library grouped by artist with normalized artist names, alphabet jump, favourites, search and media-type filters
+- Clear media badges on every song and queue row (MP3/other audio, CD+G, LRC, ELRC, ZIP, MP4), plus a "Next" marker for the first queued song
+- Queue with drag-and-drop or button reordering, move-to-front, duplicate counts, history, "play now" and duration estimates
+- Library diagnostics that group skipped files by cause and explain how to fix each one
+- One keyboard tab stop for the whole song list, with arrow-key browsing, `Enter` to queue and `Shift+Enter` to play now
 - Optional ReplayGain volume leveling
 - Keyboard shortcuts, fullscreen, and remembered volume/display settings
 - Your library never leaves the computer - files are read locally by the browser
@@ -105,9 +108,11 @@ use: `The`-article handling (`Beatles, The`), track numbers (`AZ1234-01 - ...`),
 
 Files that cannot be used are not silently dropped: anything without a matching
 `.cdg`, `.lrc`, or `.elrc`, or without an `Artist - Title` separator in the name,
-is counted in the "files skipped during the scan" notice above the library.
-Unreadable files and corrupt archives are reported there too, and the rest of
-the scan continues.
+is counted in the "files skipped during the scan" notice above the library. Open
+the notice to see each cause (missing lyrics, unreadable filename, damaged ZIP,
+unreadable folder or file) with the affected paths and a suggested fix. Unreadable
+files and corrupt archives are reported there too, and the rest of the scan
+continues.
 
 Opening a folder replaces the current library. **Add files** and drag-and-drop
 add to it instead, so extra songs can be loaded without rescanning the folder;
@@ -130,6 +135,10 @@ default track.
 | `M` | Mute |
 | `F` | Fullscreen |
 | `/` | Focus search |
+| `↑` / `↓` | Move through the song list |
+| `Home` / `End` | First or last song in the list |
+| `Enter` | Queue the focused song |
+| `Shift` + `Enter` | Play the focused song now |
 | `Esc` | Clear the search field |
 
 Shortcuts keep working after a control has focus, so clicking Play or a queue
@@ -157,12 +166,16 @@ The app is plain ES modules and CSS with no build or transpile step:
 | `js/cdg.js` | CD+G decoder and renderer |
 | `js/lrc.js` | LRC/ELRC parsing, word-timing alignment and `[offset]` handling |
 | `js/shortcuts.js` | Keyboard shortcut resolution and focus-aware key ownership |
-| `js/library.js` | Filename parsing, file pairing, resilient scanning, search |
+| `js/library.js` | Filename parsing, file pairing, resilient scanning, diagnostics, media badges and search |
+| `js/audio-duration.js` | Fast MP3 duration estimates from Xing headers or the first frame |
 | `js/zip.js` | Minimal ZIP reader (stored + deflate) |
 | `js/audio-tags.js` | ReplayGain tag parsing |
 | `js/audio-tracks.js` | Multi-track MP4 audio switching (browser permitting) |
 | `serve.js` | Static file server for development and local use |
-| `test/` | Unit tests for parsing, pairing, ZIP reading, scanning, CD+G, LRC/ELRC, ReplayGain, audio tracks and the server, plus short real MP3+G excerpts in `test/fixtures/media/` |
+| `test/` | Unit tests for parsing, pairing, ZIP reading, scanning, diagnostics, duration estimates, CD+G, LRC/ELRC, ReplayGain, audio tracks and the server, plus short real MP3+G excerpts in `test/fixtures/media/` |
+
+See [UX_IMPROVEMENT_REPORT.md](UX_IMPROVEMENT_REPORT.md) for the usability audit,
+the changes made and how they were verified.
 
 See [docs/UPSTREAM_ISSUE_ROADMAP.md](docs/UPSTREAM_ISSUE_ROADMAP.md) for the
 complete audit of upstream KaraokeEternal issues and the remaining work.
