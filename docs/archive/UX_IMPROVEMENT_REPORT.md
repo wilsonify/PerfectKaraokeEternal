@@ -2,7 +2,7 @@
 
 **Historical snapshot:** the test counts below (100 baseline, 110 after the
 changes) are as of this review. The current suite size is tracked in
-[README.md](README.md).
+[README.md](../README.md).
 
 Scope: live karaoke operation in the existing two-panel dark UI. The Classic
 slate-blue background visualizer, MP3+G/CD+G, ZIP, MP4, LRC and ELRC playback,
