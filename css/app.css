@@ -1232,6 +1232,37 @@ mark {
   color: var(--muted);
 }
 
+.history-section {
+  margin-top: 12px;
+}
+
+.history-collapsible {
+  margin: 0;
+}
+
+.history-collapsible summary.subheading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.history-collapsible summary.subheading::-webkit-details-marker {
+  display: none;
+}
+
+.history-collapsible summary.subheading::after {
+  content: '▾';
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.history-collapsible:not([open]) > summary.subheading::after {
+  content: '▸';
+}
+
 .current-card {
   padding: 12px;
   border: 1px solid rgba(255, 62, 165, 0.32);
@@ -1276,7 +1307,8 @@ mark {
 .queue-summary {
   margin: 0;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .queue-list:empty {
@@ -1289,6 +1321,10 @@ mark {
   gap: 6px;
   padding: 7px 4px;
   border-bottom: 1px solid rgba(137, 180, 250, 0.07);
+}
+
+.history-list {
+  margin-top: 8px;
 }
 
 .queue-item.is-next {
@@ -1388,6 +1424,19 @@ mark {
 .queue-item .song-info span {
   color: var(--muted);
   font-size: 0.7rem;
+}
+
+.history-list .queue-item {
+  opacity: 0.72;
+}
+
+.history-list .queue-item .song-info strong {
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.history-list .queue-item .song-info span {
+  font-size: 0.65rem;
 }
 
 .queue-item.is-current {
