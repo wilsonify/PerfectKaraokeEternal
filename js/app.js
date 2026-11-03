@@ -1,15 +1,21 @@
 import {
   buildLibrary,
   collectDirectoryRecords,
+  diagnoseWarnings,
   formatDuration,
+  formatQueueDuration,
   formatSize,
   getExtension,
   groupByArtist,
+  matchesMediaFilter,
   mergeTracks,
   mergeWarnings,
   searchTracks,
+  summarizeDurations,
   SUPPORTED_EXTENSIONS,
+  trackMedia,
 } from './library.js'
+import { estimateAudioDuration } from './audio-duration.js'
 import { describeAudioTrack } from './audio-tracks.js'
 import KaraokePlayer from './player.js'
 import { resolveShortcut } from './shortcuts.js'
@@ -104,6 +110,8 @@ const state = {
   favorites: new Set(prefs.favorites),
   filter: '',
   favoritesOnly: false,
+  mediaFilter: 'all',
+  focusedId: null,
   tab: 'library',
   openArtists: new Set(),
   visibleArtists: 60,
@@ -174,12 +182,14 @@ const els = {
   queueCount: $('queue-count'),
   search: $('search'),
   favoritesToggle: $('favorites-toggle'),
+  mediaFilters: $('media-filters'),
   librarySummary: $('library-summary'),
   warnings: $('warnings'),
   alphaPicker: $('alpha-picker'),
   libraryList: $('library-list'),
   queueList: $('queue-list'),
   currentCard: $('current-card'),
+  queueSummary: $('queue-summary'),
   queueEmpty: $('queue-empty'),
   clearQueue: $('clear-queue'),
   historySection: $('history-section'),
@@ -290,6 +300,62 @@ async function getFolderHandle () {
 
 function getTrack (id) {
   return id === null ? null : state.trackMap.get(id) ?? null
+}
+
+/* -------------------------------------------------------------------------- */
+/* Duration estimates                                                         */
+/* -------------------------------------------------------------------------- */
+
+const durationJobs = new Map()
+const durationTried = new Set()
+const DURATION_LIBRARY_LIMIT = 300
+let libraryDurationsRequested = false
+
+function canEstimateDuration (track) {
+  if (!track?.file || track.duration) return false
+  if (durationTried.has(track.id)) return false
+  if (track.kind === 'zip' || track.kind === 'zip-lrc' || track.kind === 'mp4') return false
+  return /\.mp3$/i.test(track.sourceName ?? track.path ?? '')
+}
+
+function estimateTrackDuration (track) {
+  if (durationJobs.has(track.id)) return durationJobs.get(track.id)
+
+  durationTried.add(track.id)
+  const job = estimateAudioDuration(track.file)
+    .then((result) => {
+      if (!result) return false
+      track.duration = result.seconds
+      track.durationEstimated = result.estimated
+      return true
+    })
+    .catch(() => false)
+    .finally(() => durationJobs.delete(track.id))
+
+  durationJobs.set(track.id, job)
+  return job
+}
+
+/**
+ * Fill in missing MP3 durations four at a time. The first frame is enough for
+ * queue estimates, and updates are batched so the list does not flicker.
+ */
+async function hydrateDurations (tracks) {
+  const pending = tracks.filter(track =>
+    canEstimateDuration(track) && !durationJobs.has(track.id),
+  )
+  if (pending.length === 0) return
+
+  let changed = false
+  for (let i = 0; i < pending.length; i += 4) {
+    const results = await Promise.all(pending.slice(i, i + 4).map(estimateTrackDuration))
+    if (results.includes(true)) changed = true
+  }
+
+  if (changed) {
+    renderLibrary()
+    renderQueue()
+  }
 }
 
 function initPlayer () {
@@ -714,7 +780,13 @@ function queueTrack (id, { next = false } = {}) {
   renderQueue()
   refreshSongStates()
   updateCounts()
-  showToast(next ? `Up next: ${track.title}` : `Queued: ${track.title}`)
+
+  const copies = state.queue.filter(queuedId => queuedId === id).length
+  if (next) showToast(`Up next: ${track.title}`)
+  else if (copies > 1) showToast(`Queued again: ${track.title} (${copies} in queue)`)
+  else showToast(`Queued: ${track.title}`)
+
+  if (!state.currentId) refreshInitialMessage()
 
   if (state.finished && state.queue.length === 1) {
     showStageMessage({
@@ -764,6 +836,7 @@ function removeQueueItem (index) {
   renderQueue()
   refreshSongStates()
   updateCounts()
+  if (!state.currentId) refreshInitialMessage()
 }
 
 function moveQueueItem (from, to) {
@@ -804,6 +877,7 @@ function clearQueue () {
   refreshSongStates()
   updateCounts()
   showToast('Queue cleared.')
+  if (!state.currentId) refreshInitialMessage()
 }
 
 function toggleFavorite (id) {
@@ -847,10 +921,35 @@ function trackIsCurrent (id) {
   return state.currentId === id && !state.finished
 }
 
+function trackIsNext (id) {
+  return state.queue[0] === id
+}
+
+function queueCountFor (id) {
+  return state.queue.filter(queuedId => queuedId === id).length
+}
+
 function applyTrackState (row, id) {
-  row.classList.toggle('is-current', trackIsCurrent(id))
+  const current = trackIsCurrent(id)
+  const next = trackIsNext(id)
+  row.classList.toggle('is-current', current)
+  row.classList.toggle('is-next', next)
   row.classList.toggle('is-upcoming', state.queue.includes(id))
-  row.classList.toggle('is-played', state.history.includes(id) && !trackIsCurrent(id))
+  row.classList.toggle('is-played', state.history.includes(id) && !current)
+  row.classList.toggle('is-focused', state.focusedId === id)
+  if (current) row.setAttribute('aria-current', 'true')
+  else row.removeAttribute('aria-current')
+
+  const queueCount = queueCountFor(id)
+  const countBadge = row.querySelector('.queue-count')
+  if (countBadge) {
+    countBadge.textContent = queueCount > 1 ? `×${queueCount}` : ''
+    countBadge.hidden = queueCount < 2
+  }
+}
+
+function describeMedia (track) {
+  return trackMedia(track).map(item => item.title).join(', ')
 }
 
 function buildSongRow (track, { showArtist = false, tokens = [] } = {}) {
@@ -860,8 +959,9 @@ function buildSongRow (track, { showArtist = false, tokens = [] } = {}) {
 
   const main = element('button', 'song-main')
   main.type = 'button'
-  main.title = `${track.path}\n${formatSize(track.size)}`
-  main.setAttribute('aria-label', `Queue ${track.title} by ${track.artist}`)
+  main.dataset.trackId = track.id
+  main.title = `${track.path}\n${formatSize(track.size)}\n${describeMedia(track)}`
+  main.setAttribute('aria-label', `Queue ${track.title} by ${track.artist}. ${describeMedia(track)}`)
 
   const title = element('span', 'song-title')
   title.append(highlightText(track.title, tokens))
@@ -874,22 +974,49 @@ function buildSongRow (track, { showArtist = false, tokens = [] } = {}) {
     meta.append(artist)
   }
 
-  const kinds = { 'cdg': 'CDG', 'zip': 'ZIP', 'mp4': 'MP4', 'lrc': 'LRC', 'zip-lrc': 'ZIP LRC' }
-  const badge = element('span', 'badge')
-  const badgeIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  badgeIcon.setAttribute('class', 'icon')
-  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
-  use.setAttribute('href', `#i-${track.kind === 'mp4' ? 'video' : track.kind === 'zip' || track.kind === 'zip-lrc' ? 'zip' : 'music'}`)
-  badgeIcon.append(use)
-  badge.append(badgeIcon, document.createTextNode(kinds[track.kind] ?? track.kind))
-  meta.append(badge)
+  const media = trackMedia(track)
+  if (media.length > 0) {
+    const badges = element('span', 'badges')
+    for (const item of media) {
+      const badge = element('span', `badge badge-${item.tone}`, item.label)
+      badge.title = item.title
+      badges.append(badge)
+    }
+    meta.append(badges)
+  }
+
+  const count = element('span', 'queue-count')
+  count.hidden = queueCountFor(track.id) < 2
+  meta.append(count)
 
   main.append(meta)
-  main.addEventListener('click', () => queueTrack(track.id))
+  main.addEventListener('click', () => {
+    state.focusedId = track.id
+    queueTrack(track.id)
+  })
+  main.addEventListener('focus', () => {
+    if (state.focusedId === track.id) return
+    state.focusedId = track.id
+    for (const other of els.libraryList.querySelectorAll('.song-row')) {
+      other.classList.toggle('is-focused', other.dataset.trackId === track.id)
+    }
+    const active = els.libraryList.querySelector('.song-main[tabindex="0"]')
+    if (active && active !== main) active.tabIndex = -1
+    main.tabIndex = 0
+  })
   row.append(main)
 
-  const duration = element('span', 'duration', formatDuration(track.duration))
+  const duration = element(
+    'span',
+    track.durationEstimated ? 'duration is-estimated' : 'duration',
+    track.durationEstimated ? `~${formatDuration(track.duration)}` : formatDuration(track.duration),
+  )
+  if (track.durationEstimated) duration.title = 'Estimated duration'
   row.append(duration)
+
+  const next = iconButton('next', `Play ${track.title} next`, 'queue-next')
+  next.addEventListener('click', () => queueTrack(track.id, { next: true }))
+  row.append(next)
 
   const star = iconButton('star', state.favorites.has(track.id) ? 'Remove from favorites' : 'Add to favorites', 'star')
   star.classList.toggle('is-on', state.favorites.has(track.id))
@@ -904,6 +1031,41 @@ function buildSongRow (track, { showArtist = false, tokens = [] } = {}) {
   return row
 }
 
+function visibleSongMains () {
+  return [...els.libraryList.querySelectorAll('.song-main')]
+}
+
+/**
+ * One tab stop for the whole song list. Arrow keys move between songs, so
+ * keyboard users can browse a large library without tabbing through every row.
+ */
+function applyRovingTabindex (preferredId = state.focusedId) {
+  const mains = visibleSongMains()
+  if (mains.length === 0) return
+
+  const preferred = preferredId
+    ? mains.find(main => main.dataset.trackId === preferredId)
+    : null
+  const active = preferred ?? mains[0]
+
+  for (const main of mains) main.tabIndex = main === active ? 0 : -1
+  state.focusedId = active.dataset.trackId
+  for (const row of els.libraryList.querySelectorAll('.song-row')) {
+    row.classList.toggle('is-focused', row.dataset.trackId === state.focusedId)
+  }
+}
+
+function moveLibraryFocus (direction) {
+  const mains = visibleSongMains()
+  if (mains.length === 0) return
+  const currentIndex = mains.findIndex(main => main.dataset.trackId === state.focusedId)
+  const fallback = direction > 0 ? 0 : mains.length - 1
+  const nextIndex = currentIndex === -1
+    ? fallback
+    : Math.max(0, Math.min(mains.length - 1, currentIndex + direction))
+  mains[nextIndex].focus()
+}
+
 function renderArtistGroups (artists) {
   const tokens = currentFilterTokens()
   const names = [...artists.keys()]
@@ -913,6 +1075,7 @@ function renderArtistGroups (artists) {
     const tracks = artists.get(name)
     const details = element('details', 'artist-group')
     details.dataset.artist = name
+    details.dataset.artistKey = tracks[0]?.artistKey ?? name.toLowerCase()
     details.dataset.letter = /^[a-z]/i.test(name) ? name[0].toUpperCase() : '#'
     details.open = state.openArtists.has(name)
     if (tracks.some(track => trackIsCurrent(track.id))) details.classList.add('has-current')
@@ -955,7 +1118,13 @@ function renderSearchResults (tracks) {
   const tokens = currentFilterTokens()
 
   if (tracks.length === 0) {
-    els.libraryList.append(element('p', 'list-note', 'No songs match that search.'))
+    const label = { cdg: 'CD+G', lyrics: 'LRC', video: 'MP4', zip: 'ZIP' }[state.mediaFilter]
+    let message = 'No songs match that search.'
+    if (!state.filter) {
+      if (state.favoritesOnly) message = 'No favorite songs yet. Use the star on a song to add one.'
+      else if (label) message = `No ${label} songs in this library.`
+    }
+    els.libraryList.append(element('p', 'list-note', message))
     return
   }
 
@@ -988,19 +1157,39 @@ function renderWarnings () {
     return
   }
 
+  const report = diagnoseWarnings(state.warnings)
   els.warnings.hidden = false
+
   const details = element('details')
-  const summary = element('summary', null, `${state.warnings.length} file${state.warnings.length === 1 ? '' : 's'} skipped during the scan`)
-  const list = element('ul')
-  for (const warning of state.warnings) {
-    list.append(element('li', null, `${warning.path} — ${warning.reason}`))
+  const summary = element(
+    'summary',
+    null,
+    `${report.total} file${report.total === 1 ? '' : 's'} skipped during the scan · see how to fix`,
+  )
+
+  const groups = element('div', 'warning-groups')
+  for (const group of report.groups) {
+    const section = element('section', 'warning-group')
+    const heading = element('h3', null, `${group.category} (${group.items.length})`)
+    section.append(heading, element('p', 'warning-hint', group.hint))
+
+    const list = element('ul')
+    for (const item of group.items) {
+      const entry = element('li')
+      entry.append(element('code', null, item.displayPath))
+      entry.append(document.createTextNode(` — ${item.reason}`))
+      list.append(entry)
+    }
+    section.append(list)
+    groups.append(section)
   }
-  details.append(summary, list)
+
+  details.append(summary, groups)
   els.warnings.replaceChildren(details)
 }
 
 function renderAlphaPicker (artists) {
-  if (state.filter || state.favoritesOnly || artists.size === 0) {
+  if (state.filter || state.favoritesOnly || state.mediaFilter !== 'all' || artists.size === 0) {
     els.alphaPicker.hidden = true
     els.alphaPicker.replaceChildren()
     return
@@ -1033,13 +1222,27 @@ function renderLibrary () {
   els.libraryList.replaceChildren()
 
   const artists = groupByArtist(state.tracks)
-  const filtered = state.filter || state.favoritesOnly
+  const filtering = Boolean(state.filter || state.favoritesOnly || state.mediaFilter !== 'all')
+  const matched = filtering
     ? searchTracks(state.tracks, state.filter, state.favoritesOnly ? state.favorites : null)
+    : []
+  const filtered = filtering
+    ? matched.filter(track => matchesMediaFilter(track, state.mediaFilter))
     : null
+
+  const totals = summarizeDurations(state.tracks)
+  const totalTime = formatQueueDuration(totals.seconds)
+  const summaryParts = [
+    `${state.tracks.length} song${state.tracks.length === 1 ? '' : 's'}`,
+    `${artists.size} artist${artists.size === 1 ? '' : 's'}`,
+    totalTime ? `${totalTime} total` : null,
+    state.favoritesOnly ? `${state.favorites.size} favorite${state.favorites.size === 1 ? '' : 's'}` : null,
+    filtered ? `${filtered.length} shown` : null,
+  ]
 
   els.librarySummary.textContent = state.tracks.length === 0
     ? 'No songs loaded yet.'
-    : `${state.tracks.length} song${state.tracks.length === 1 ? '' : 's'} · ${artists.size} artist${artists.size === 1 ? '' : 's'}${state.favoritesOnly ? ` · ${state.favorites.size} favorite${state.favorites.size === 1 ? '' : 's'}` : ''}`
+    : summaryParts.filter(Boolean).join(' · ')
 
   updateCounts()
   renderWarnings()
@@ -1068,7 +1271,12 @@ function renderLibrary () {
     renderArtistGroups(artists)
   }
 
+  applyRovingTabindex()
   els.libraryList.scrollTop = scrollTop
+  if (!libraryDurationsRequested) {
+    libraryDurationsRequested = true
+    void hydrateDurations(state.tracks.slice(0, DURATION_LIBRARY_LIMIT))
+  }
 }
 
 function refreshSongStates () {
@@ -1077,10 +1285,10 @@ function refreshSongStates () {
   }
 
   for (const details of els.libraryList.querySelectorAll('.artist-group')) {
-    const artist = details.dataset.artist
+    const current = state.currentId ? getTrack(state.currentId) : null
     details.classList.toggle(
       'has-current',
-      Boolean(state.currentId && getTrack(state.currentId)?.artist === artist && !state.finished),
+      Boolean(current && current.artistKey === details.dataset.artistKey && !state.finished),
     )
   }
 
@@ -1106,6 +1314,7 @@ function buildQueueRow (id, index, { history = false } = {}) {
   row.dataset.index = String(index)
   row.dataset.queueId = id
   if (!history) {
+    row.classList.toggle('is-next', index === 0 && !trackIsCurrent(id))
     row.draggable = true
     row.addEventListener('dragstart', (event) => {
       state.dragIndex = index
@@ -1133,6 +1342,8 @@ function buildQueueRow (id, index, { history = false } = {}) {
 
   if (!history) {
     row.append(element('span', 'queue-position', String(index + 1)))
+    if (index === 0) row.append(element('span', 'queue-flag', 'Next'))
+    else row.append(element('span', 'queue-flag-spacer', ''))
     const handle = element('span', 'drag-handle')
     handle.title = 'Drag to reorder'
     handle.setAttribute('aria-hidden', 'true')
@@ -1148,6 +1359,24 @@ function buildQueueRow (id, index, { history = false } = {}) {
   const info = element('div', 'song-info')
   info.append(element('strong', null, track?.title ?? 'Unavailable song'))
   info.append(element('span', null, track?.artist ?? 'Reopen the original music folder to restore this entry'))
+  if (track) {
+    const badges = element('span', 'queue-media')
+    for (const item of trackMedia(track)) {
+      const badge = element('span', `badge badge-${item.tone}`, item.label)
+      badge.title = item.title
+      badges.append(badge)
+    }
+    const copies = history ? 0 : queueCountFor(id)
+    if (copies > 1) badges.append(element('span', 'queue-count', `×${copies} in queue`))
+    if (track.duration) {
+      badges.append(element(
+        'span',
+        track.durationEstimated ? 'queue-duration is-estimated' : 'queue-duration',
+        track.durationEstimated ? `~${formatDuration(track.duration)}` : formatDuration(track.duration),
+      ))
+    }
+    if (badges.childElementCount > 0) info.append(badges)
+  }
   row.append(info)
 
   const actions = element('div', 'queue-actions')
@@ -1159,6 +1388,11 @@ function buildQueueRow (id, index, { history = false } = {}) {
     const play = iconButton('play', 'Play this song now')
     play.addEventListener('click', () => playQueueItem(index))
     actions.append(play)
+
+    const toFront = iconButton('next', 'Move to the front of the queue')
+    toFront.disabled = index === 0
+    toFront.addEventListener('click', () => moveQueueItem(index, 0))
+    actions.append(toFront)
 
     const up = iconButton('up', 'Move up')
     up.disabled = index === 0
@@ -1198,7 +1432,8 @@ function renderQueue () {
     els.currentCard.append(label)
     if (current) {
       els.currentCard.append(element('strong', null, current.title))
-      els.currentCard.append(element('p', null, `${current.artist} · ${current.kind.toUpperCase()}`))
+      const meta = element('p', null, `${current.artist} · ${trackMedia(current).map(item => item.label).join(' · ')}`)
+      els.currentCard.append(meta)
     } else {
       els.currentCard.append(element('strong', null, 'Unavailable song'))
       els.currentCard.append(element('p', null, 'Reopen the original music folder to restore it.'))
@@ -1211,6 +1446,21 @@ function renderQueue () {
 
   for (let i = 0; i < state.queue.length; i++) {
     els.queueList.append(buildQueueRow(state.queue[i], i))
+  }
+
+  const queueTracks = state.queue.map(getTrack).filter(Boolean)
+  const totals = summarizeDurations(queueTracks)
+  void hydrateDurations(queueTracks)
+  if (state.queue.length === 0) {
+    els.queueSummary.hidden = true
+    els.queueSummary.textContent = ''
+  } else {
+    const parts = [`${state.queue.length} upcoming`]
+    const time = formatQueueDuration(totals.seconds)
+    if (time) parts.push(time)
+    if (totals.unknown > 0) parts.push(`${totals.unknown} duration${totals.unknown === 1 ? '' : 's'} unknown`)
+    els.queueSummary.hidden = false
+    els.queueSummary.textContent = parts.join(' · ')
   }
 
   if (state.queue.length === 0) {
@@ -1236,7 +1486,10 @@ function renderQueue () {
   const nextTrack = getTrack(state.queue[0])
   if (nextTrack) {
     els.upNext.hidden = false
-    els.upNextTitle.textContent = `${nextTrack.title} — ${nextTrack.artist}`
+    const nextDuration = nextTrack.duration
+      ? ` · ${nextTrack.durationEstimated ? '~' : ''}${formatDuration(nextTrack.duration)}`
+      : ''
+    els.upNextTitle.textContent = `${nextTrack.title} — ${nextTrack.artist}${nextDuration}`
   } else {
     els.upNext.hidden = true
     els.upNextTitle.textContent = ''
@@ -1338,10 +1591,13 @@ function refreshInitialMessage () {
 
   if (state.currentId && player.track?.id !== state.currentId) {
     const track = getTrack(state.currentId)
+    const next = getTrack(state.queue[0])
     setStageMessage({
       kicker: 'Ready',
       title: track ? `${track.title} — ${track.artist}` : 'Saved queue restored',
-      text: 'Press play to continue where you left off.',
+      text: next
+        ? `Press play to resume. Up next: ${next.title} — ${next.artist}.`
+        : 'Press play to continue where you left off.',
       play: true,
     })
     return
@@ -1352,10 +1608,15 @@ function refreshInitialMessage () {
     return
   }
 
+  const next = getTrack(state.queue[0])
   setStageMessage({
     kicker: 'Library ready',
-    title: 'Pick a song to start singing',
-    text: 'Choose a song from the library, or queue several and let them play.',
+    title: next ? 'Ready for the first song' : 'Pick a song to start singing',
+    text: next
+      ? `${next.title} — ${next.artist} is up first. Press Play or Space, or pick another song.`
+      : `${state.tracks.length} song${state.tracks.length === 1 ? '' : 's'} ready. Search with /, use the up/down arrow keys to browse, then Enter to queue.`,
+    play: Boolean(next),
+    hasMedia: Boolean(next),
   })
 }
 
@@ -1450,6 +1711,8 @@ async function scanRecords (records, sourceLabel, scanWarnings = [], { append = 
     // library add to it instead of wiping what is already loaded.
     state.tracks = append ? mergeTracks(state.tracks, result.tracks) : result.tracks
     state.trackMap = new Map(state.tracks.map(track => [track.id, track]))
+    libraryDurationsRequested = false
+    for (const track of result.tracks) durationTried.delete(track.id)
     const warnings = [...scanWarnings, ...result.warnings]
     state.warnings = append ? mergeWarnings(state.warnings, warnings) : warnings
     state.visibleArtists = 60
@@ -1763,6 +2026,51 @@ function bindEvents () {
     state.favoritesOnly = !state.favoritesOnly
     els.favoritesToggle.setAttribute('aria-pressed', String(state.favoritesOnly))
     renderLibrary()
+  })
+
+  els.mediaFilters.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-media]')
+    if (!button) return
+    state.mediaFilter = button.dataset.media
+    state.visibleResults = 200
+    state.visibleArtists = 60
+    for (const chip of els.mediaFilters.querySelectorAll('button[data-media]')) {
+      chip.setAttribute('aria-pressed', String(chip === button))
+    }
+    renderLibrary()
+  })
+
+  els.search.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowDown') return
+    event.preventDefault()
+    moveLibraryFocus(1)
+  })
+
+  els.libraryList.addEventListener('keydown', (event) => {
+    const main = event.target.closest('.song-main')
+    if (!main) return
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      event.stopPropagation()
+      moveLibraryFocus(event.key === 'ArrowDown' ? 1 : -1)
+      return
+    }
+
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      event.stopPropagation()
+      const mains = visibleSongMains()
+      const target = event.key === 'Home' ? mains[0] : mains[mains.length - 1]
+      target?.focus()
+      return
+    }
+
+    if (event.key === 'Enter' && event.shiftKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      playNow(main.dataset.trackId)
+    }
   })
 
   els.tabLibrary.addEventListener('click', () => setTab('library'))
