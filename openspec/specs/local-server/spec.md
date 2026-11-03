@@ -8,7 +8,7 @@ Describe how the application is served and opened locally: the static file serve
 
 ### Requirement: Loopback-only by default
 
-The static server (`serve.js`) SHALL listen on `127.0.0.1` by default. Listening on other interfaces SHALL require an explicit opt-in via the `--host` flag or `HOST` environment variable, and the server SHALL print a warning when non-loopback hosting is requested.
+The static server (`serve.js`) SHALL listen on `127.0.0.1` by default. Listening on other interfaces SHALL require an explicit opt-in via the `--host` flag or `HOST` environment variable, and the server SHALL print a warning that other devices on the network can reach the player.
 
 #### Scenario: Default binding
 
@@ -22,7 +22,7 @@ The static server (`serve.js`) SHALL listen on `127.0.0.1` by default. Listening
 - **GIVEN** the server is started with `--host 0.0.0.0` (or `HOST=0.0.0.0`)
 - **WHEN** it binds its listening socket
 - **THEN** it listens on all interfaces
-- **AND** it prints a warning that there is no authentication and the network must be trusted
+- **AND** it prints a warning that other devices on the network can reach the player
 
 ### Requirement: Application-files-only allowlist
 
