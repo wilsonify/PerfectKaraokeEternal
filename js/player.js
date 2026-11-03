@@ -56,6 +56,7 @@ export default class KaraokePlayer {
     this.visualState = {}
     this.connectedElements = new WeakSet()
     this.visualizerSize = { width: 0, height: 0, dpr: 1 }
+    this.cdgLayout = { key: '', scale: 1 }
 
     this.els.canvas.width = 300
     this.els.canvas.height = 216
@@ -76,7 +77,9 @@ export default class KaraokePlayer {
     this.resizeObserver = new ResizeObserver(() => {
       this.resizeVisualizer()
       if (this.mode === 'cdg' && this.lastFrame) this.drawFrame(this.lastFrame, true)
-      if (this.mode === 'cdg' && this.isPlaying) this.drawVisualizer()
+      // Resizing the canvas clears it. Redraw even while paused so the stage
+      // does not go blank after a window resize or entering fullscreen.
+      if (this.mode === 'cdg' || this.mode === 'lrc') this.drawVisualizer()
     })
     this.resizeObserver.observe(this.els.stage)
 
@@ -622,19 +625,25 @@ export default class KaraokePlayer {
   layoutCDG (redraw) {
     const width = this.els.stage.clientWidth
     const height = this.els.stage.clientHeight
-    if (!width || !height) return 1
+    if (!width || !height) return this.cdgLayout.scale
 
-    const wScale = (width - 20) / 300
-    const hScale = ((height - 20) * this.options.cdgSize) / 216
-    const scale = Math.max(0.01, Math.min(wScale, hScale))
+    // The observer can fire often, and every changed CD+G frame asks for the
+    // current scale. Only write layout styles when the stage or size changed.
+    const key = `${width}x${height}:${this.options.cdgSize}`
+    if (key !== this.cdgLayout.key) {
+      const wScale = (width - 20) / 300
+      const hScale = ((height - 20) * this.options.cdgSize) / 216
+      const scale = Math.max(0.01, Math.min(wScale, hScale))
+      this.cdgLayout = { key, scale }
 
-    this.els.cdgLayer.style.width = `${300 * scale}px`
-    this.els.cdgLayer.style.height = `${216 * scale}px`
-    this.els.canvas.style.width = '100%'
-    this.els.canvas.style.height = '100%'
+      this.els.cdgLayer.style.width = `${300 * scale}px`
+      this.els.cdgLayer.style.height = `${216 * scale}px`
+      this.els.canvas.style.width = '100%'
+      this.els.canvas.style.height = '100%'
+    }
 
     if (redraw && this.lastFrame) this.drawFrame(this.lastFrame, true)
-    return scale
+    return this.cdgLayout.scale
   }
 
   drawVisualizer () {
