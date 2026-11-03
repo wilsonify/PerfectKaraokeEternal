@@ -1,58 +1,87 @@
-# Documentation index
+# PerfectKaraokeEternal documentation
 
-PerfectKaraokeEternal is a local, browser-only karaoke player. This index maps
-the documentation by purpose so nothing is looked up in the wrong file.
+PerfectKaraokeEternal is a local, browser-only karaoke player. This page is the map: pick the guide
+that matches what you are trying to do.
 
-## Getting started and user guide
+## Start here
 
-- [../README.md](../README.md) — features, requirements, running the app, song
-  file naming, keyboard shortcuts.
+| I want to… | Read |
+| --- | --- |
+| Install and use the player, organize a song library, and sing | [User guide](USER_GUIDE.md) |
+| Run the player for others, expose it on a network, or maintain it | [Administrator guide](ADMIN_GUIDE.md) |
+| Understand the code, run tests, or contribute a change | [Developer guide](DEVELOPER_GUIDE.md) and [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Fix a problem | [Troubleshooting](TROUBLESHOOTING.md) |
+| Know exactly what the app is specified to do | [`openspec/specs/`](../openspec/specs/) |
+| See what changed | [Changelog](CHANGELOG.md) |
+| Read past QA, UX, and upstream-issue reports | [Archive](archive/README.md) |
 
-## Developer guide
+New to the project? Read the [user guide's first three sections](USER_GUIDE.md#1-before-you-start),
+then come back here when you need administration or development detail.
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — how to propose a change with OpenSpec,
-  update specifications, validate, archive, and keep docs synchronized.
-- [../README.md](../README.md#development) — commands (`npm test`,
-  `npm run lint`) and the module map.
+## Guides
 
-## Specifications (authoritative for current behavior)
+| Document | Audience | Covers |
+| --- | --- | --- |
+| [USER_GUIDE.md](USER_GUIDE.md) | Singers and library owners | Supported formats, starting the app, folder selection, file naming and pairing, searching, queueing, playback, lyrics, visuals, shortcuts, mobile use, privacy |
+| [ADMIN_GUIDE.md](ADMIN_GUIDE.md) | Whoever runs the server | Requirements, install and start, port/host, local vs LAN vs internet exposure, server behavior, security, storage and backup, updates, browser support, maintenance |
+| [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Contributors | Constraints, repository layout, architecture and data flow, setup, test suite, conventions, debugging, browser APIs, known gaps, performance |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Everyone | Symptom-based fixes for serving, folder access, library contents, playback, lyrics, layout, and saved state |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contributors | When a change proposal is required, the OpenSpec workflow, specification rules, verification, changelog, and documentation synchronization |
+| [CHANGELOG.md](CHANGELOG.md) | Everyone | Newest entries under `[Unreleased]`; released entries; inherited upstream history behind a scope note |
 
-- [../openspec/specs/](../openspec/specs/) — OpenSpec specifications of
-  observable behavior, one folder per capability:
-  `media-library`, `playback`, `queue`, `lyrics`, `cdg-playback`,
-  `mp4-playback`, `visuals`, `interface`, `display`,
-  `local-library-restoration`, `local-server`.
-- [../openspec/config.yaml](../openspec/config.yaml) — project context and
-  artifact rules applied to every OpenSpec change.
+The repository [README](../README.md) is the project's front page and quick start. Detailed
+instructions belong in these guides, not there.
 
-Specifications describe **what the app does today**; the README describes **how
-to use it**; the source is authoritative for **how it is implemented**. When
-those disagree, fix the stale side — see CONTRIBUTING.md.
+## Specifications are authoritative
 
-## Testing and QA
+[`openspec/specs/`](../openspec/specs/) contains one specification per capability, describing only
+behavior that exists today with `SHALL` requirements and Given/When/Then scenarios:
 
-- Live suite: run `npm test` (124 tests as of 2026-11-03) and `npm run lint`.
-  This index is where the current count is tracked; historical reports keep
-  their own dated counts.
-- [QA_REPORT_2026-10-29.md](QA_REPORT_2026-10-29.md) — **historical** QA review
-  of the tree at `6524803c` (72 tests that day). Findings later resolved carry
-  a dated "superseded" note; the report is not rewritten.
+`media-library`, `playback`, `queue`, `lyrics`, `cdg-playback`, `mp4-playback`, `visuals`,
+`interface`, `display`, `local-library-restoration`, `local-server`.
 
-## Changelog
+Order of authority:
 
-- [CHANGELOG.md](CHANGELOG.md) — newest entries first under `[Unreleased]`.
-  Entries from v2.0.2 downward are inherited upstream KaraokeEternal history
-  (their scope is called out in the note above that section).
+1. **Specifications** define observable behavior.
+2. **Tests and source** prove what is implemented.
+3. **Guides** explain how to use and run it.
+4. **Historical reports** record what was true on their date.
 
-## Upstream compatibility and issue tracking
+If a guide and a spec disagree, the spec wins. If a spec and verified behavior disagree, the spec is
+the defect and is corrected directly (see [CONTRIBUTING.md](CONTRIBUTING.md)). If a specification
+cannot describe something yet — for example native Safari multi-track playback — the spec marks it
+as a known gap instead of claiming it works.
 
-- [UPSTREAM_ISSUE_ROADMAP.md](UPSTREAM_ISSUE_ROADMAP.md) — audit of the upstream
-  KaraokeEternal issue tracker as of 2026-10-28. Upstream state is frozen at
-  that date; the **Local status** column and the phased plan are maintained as
-  work lands.
+Project-wide artifact rules for OpenSpec changes live in
+[`openspec/config.yaml`](../openspec/config.yaml).
 
-## UX history
+## Testing status
 
-- [UX_IMPROVEMENT_REPORT.md](UX_IMPROVEMENT_REPORT.md) — **historical**
-  November 2026 usability review: problems found, changes made, verification
-  (100 → 110 tests that day).
+Run the live suite rather than trusting a number in prose:
+
+```bash
+npm test       # 124 tests as of 2026-11-03
+npm run lint
+```
+
+This index is the one place where the current test count is tracked. Historical reports keep the
+count from their own date.
+
+## Historical archive
+
+Dated reports are preserved in [archive/](archive/README.md) for their evidence and research:
+the 2026-10-29 QA review, the November 2026 UX improvement report, and the 2026-10-28 upstream
+issue audit. They are snapshots, not current guidance.
+
+## Project facts
+
+| Fact | Value |
+| --- | --- |
+| Runtime | Browser only; no backend, accounts, database, or uploads |
+| Application code | Vanilla ES modules and CSS, no build step |
+| Runtime dependencies | None |
+| Server | `serve.js`, Node.js 20+, static files only, loopback by default |
+| Supported media | MP3+G (CD+G), audio with LRC/ELRC, zipped pairs, MP4 video |
+| Tests | `node:test`; fixtures include real short MP3+G excerpts |
+| Behavior contract | OpenSpec specifications in `openspec/specs/` |
+| License | ISC (CD+G decoder adapted from cdgraphics, ISC) |
