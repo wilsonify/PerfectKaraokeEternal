@@ -1,0 +1,31 @@
+schema: spec-driven
+
+context: |
+  PerfectKaraokeEternal is a local, browser-only karaoke player: vanilla ES modules and CSS,
+  no build step, no runtime dependencies, no backend, no accounts, no database, no network
+  features. serve.js is a static file server only (loopback by default, allowlisted paths).
+  All durable state lives in the browser: localStorage (pke.prefs.v1, pke.session.v1),
+  IndexedDB (pke-files/handles) for remembered folder handles, and browser preferences.
+  Supported media: MP3+G (CD+G), audio with LRC/ELRC lyrics (loose or zipped), and MP4 video.
+  Verification: `npm test` (node:test, 110 tests) and `npm run lint` (ESLint). Prefer
+  requirements that are observable behavior covered by tests; note coverage when it exists.
+  Specifications must not duplicate README.md's module inventory or user-facing tutorial text.
+
+rules:
+  proposal:
+    - State what is out of scope
+    - Say how the change will be verified (which test or manual check)
+  specs:
+    - Use SHALL for requirements and Given/When/Then scenarios
+    - Specify only behavior that exists today; mark known gaps explicitly as gaps
+  tasks:
+    - Each task states how to verify it
+
+operations:
+  apply:
+    guidance:
+      - Do not change application behavior unless the change proposal says so
+      - Run npm test and npm run lint before claiming a task done
+  archive:
+    guidance:
+      - Confirm npm test and npm run lint pass before archiving
