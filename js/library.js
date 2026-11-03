@@ -380,7 +380,7 @@ function zipEntryCandidates (entry, archiveName) {
     : [base, archiveBase]
 }
 
-async function parseOrWarn (candidates, warnings, path, file = null) {
+function parseCandidateName (candidates) {
   for (const candidate of candidates) {
     try {
       const parsed = parseTrackName(candidate)
@@ -390,15 +390,70 @@ async function parseOrWarn (candidates, warnings, path, file = null) {
     }
   }
 
+  return null
+}
+
+async function parseFileTags (file) {
   const metadata = file ? await readMp3Tags(file) : null
-  if (metadata?.artist && metadata?.title) {
-    return {
-      artist: metadata.artist,
-      artistNorm: normalizeString(metadata.artist),
-      title: metadata.title,
-      titleNorm: normalizeString(metadata.title),
+  if (!metadata?.artist || !metadata?.title) return null
+
+  return {
+    artist: metadata.artist,
+    artistNorm: normalizeString(metadata.artist),
+    title: metadata.title,
+    titleNorm: normalizeString(metadata.title),
+  }
+}
+
+/**
+ * Karaoke collections keep one song per folder, often named
+ * `<track> - <artist> - <title>`. The folder supplies the artist only when its
+ * title repeats the file's own, so a numbered album folder cannot relabel the
+ * songs inside it.
+ */
+function folderNameCandidates (path) {
+  const folder = dirName(path).split('/').filter(Boolean).pop() ?? ''
+  if (!/^\d+(?:\.\d+)?\s*-\s*\S/.test(folder)) return []
+
+  const parsed = parseCandidateName([folder])
+  if (!parsed) return []
+
+  const songName = stripKaraokeSuffix(getBaseName(fileName(path)).replace(/^\s*\d+(?:\.\d+)?\s*-\s*/, ''))
+  const title = normalizeString(songName).toLowerCase()
+
+  return title && title === parsed.titleNorm.toLowerCase() ? [folder] : []
+}
+
+/**
+ * Audio files in the same folder that share a base name once a karaoke suffix
+ * is ignored: the tagged `Song.mp3` beside an untagged `Song - Karaoke.mp3`.
+ */
+function namedSiblings (record, audioByDirectory) {
+  const directory = dirName(record.path)
+  const key = karaokeCompanionKey(record.path)
+
+  return (audioByDirectory.get(directory) ?? [])
+    .filter(other => other.path !== record.path && karaokeCompanionKey(other.path) === key)
+    .map(other => ({ name: getBaseName(fileName(other.path)), file: other.file }))
+}
+
+/**
+ * Identify a song from its name or its numbered song folder, then its ID3 tags,
+ * then a same-name file in the same folder. Karaoke tools render backing tracks
+ * without tags, so `Song - Karaoke.mp3` takes the artist and title of its
+ * source `Song.mp3`.
+ */
+async function parseOrWarn (candidates, warnings, path, file = null, findHints = null) {
+  let parsed = parseCandidateName(candidates) ?? await parseFileTags(file)
+
+  if (!parsed && findHints) {
+    for (const hint of findHints()) {
+      parsed = parseCandidateName([hint.name]) ?? await parseFileTags(hint.file)
+      if (parsed) break
     }
   }
+
+  if (parsed) return parsed
 
   warnings.push({ path, reason: 'could not determine artist and title from filename' })
   return null
@@ -413,6 +468,7 @@ export async function buildLibrary (records, { onProgress } = {}) {
   const tracks = []
   const indexes = { cdg: new Map(), lrc: new Map(), elrc: new Map() }
   const karaokeCompanionKeys = new Set()
+  const audioByDirectory = new Map()
   const seen = new Set()
   const candidates = records.filter((record) => {
     if (!SUPPORTED_EXTENSIONS.includes(getExtension(record.file.name))) return false
@@ -427,8 +483,14 @@ export async function buildLibrary (records, { onProgress } = {}) {
 
   for (const record of candidates) {
     const extension = getExtension(record.file.name)
-    if (CDG_AUDIO_EXTENSIONS.includes(extension) && audioIsKaraokeVariant(record.path)) {
-      karaokeCompanionKeys.add(karaokeCompanionKey(record.path))
+    if (CDG_AUDIO_EXTENSIONS.includes(extension)) {
+      if (audioIsKaraokeVariant(record.path)) {
+        karaokeCompanionKeys.add(karaokeCompanionKey(record.path))
+      }
+      const directory = dirName(record.path)
+      const siblings = audioByDirectory.get(directory)
+      if (siblings) siblings.push(record)
+      else audioByDirectory.set(directory, [record])
     }
     if (extension === '.cdg' || extension === '.lrc' || extension === '.elrc') {
       indexes[extension.slice(1)].set(companionKey(record.path), record)
@@ -524,10 +586,11 @@ export async function buildLibrary (records, { onProgress } = {}) {
         }
 
         const parsed = await parseOrWarn(
-          [getBaseName(record.file.name)],
+          [getBaseName(record.file.name), ...folderNameCandidates(record.path)],
           warnings,
           record.path,
           record.file,
+          () => namedSiblings(record, audioByDirectory),
         )
         if (!parsed) continue
 
