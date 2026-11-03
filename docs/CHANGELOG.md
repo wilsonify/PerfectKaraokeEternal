@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- A numbered song folder such as `01 - Eve 6 - Inside Out/` now supplies the artist for the files inside it when their own names and tags carry none, so renamed folders load; a numbered folder whose title does not match the file is ignored
+- Rendered backing tracks now inherit their artist and title from the tagged source file beside them, so a folder of numbered variants (`01 - Song.mp3` with `01 - Song - Karaoke.mp3`) loads instead of reporting the karaoke copy as an unreadable filename
 - Documentation: added user, administrator, developer, and troubleshooting guides; moved the dated QA, UX, and upstream-issue reports to `docs/archive/`; corrected the local-server spec's LAN warning wording to match the server's actual message
 - Reopening the library is now remembered for both the native folder picker and the directory-input fallback: `Reopen “<folder>”` restores the handle where the browser allows it, explains when the browser asks for the folder again, and reports granted, denied or unavailable access without clearing the loaded library
 - Folder scans now use paths relative to the selected folder, so opening the same folder through the picker or the directory input no longer duplicates songs or drops the saved queue; a folder that cannot be read leaves the current library intact
