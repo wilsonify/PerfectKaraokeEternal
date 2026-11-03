@@ -181,6 +181,22 @@ filename.
 
 **Fix:** rename to `Artist - Title.mp4`. MP4 does not need a lyrics companion.
 
+### A karaoke variant is reported as an unreadable filename
+
+**Cause:** the rendered backing track (`01 - Song - Karaoke.mp3`) has no artist in its name, the
+same-name source beside it (`01 - Song.mp3`) has no artist tags (neither artist nor album artist),
+and the folder is not named after the song either. Common for stems rendered with streaming tools,
+which keep only encoder metadata.
+
+**Fix**, any one of these:
+
+- rename the song folder to `<track> - <artist> - <title>`, keeping its title equal to the file's
+  (`01 - Eve 6 - Inside Out/`);
+- set the artist (or album artist) and title tags on the source MP3 with any tag editor, so the
+  karaoke variant inherits them;
+- rename both files to `Artist - Title.mp3` and `Artist - Title - Karaoke.mp3`, and rename their
+  `.lrc`/`.elrc` companions to match.
+
 ### The same song appears twice
 
 **Causes:** two copies of the song exist in the selected folder or archive (for example a plain and
