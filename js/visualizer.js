@@ -103,6 +103,7 @@ function drawMirroredBars (ctx, frame, palette) {
   const barWidth = (width - gap * (bars - 1)) / bars
   const baseline = height * 0.42
   const maxHeight = height * 0.5
+  const factor = sensitivityFactor(sensitivity)
 
   const [topColor, midColor, baseColor] = palette.barGradient
   const gradient = ctx.createLinearGradient(0, baseline - maxHeight, 0, baseline)
@@ -114,7 +115,7 @@ function drawMirroredBars (ctx, frame, palette) {
   for (let i = 0; i < bars; i++) {
     const sample = Math.floor((i / bars) * (frequencyData.length * 0.7))
     const value = (frequencyData[sample] ?? 0) / 255
-    const barHeight = Math.max(2 * dpr, value * maxHeight * sensitivity)
+    const barHeight = Math.max(2 * dpr, value * maxHeight * factor)
     const x = i * (barWidth + gap)
     ctx.fillRect(x, baseline - barHeight / 2, barWidth, barHeight)
 
@@ -126,7 +127,7 @@ function drawMirroredBars (ctx, frame, palette) {
   // Soft glow that responds to overall level.
   let total = 0
   for (let i = 0; i < 32; i++) total += frequencyData[i] ?? 0
-  const glow = Math.min(1, (total / (32 * 255)) * sensitivity)
+  const glow = Math.min(1, (total / (32 * 255)) * factor)
   const radial = ctx.createRadialGradient(
     width / 2, height * 0.75, 0,
     width / 2, height * 0.75, width * 0.55,
