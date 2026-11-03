@@ -7,8 +7,9 @@ context: |
   All durable state lives in the browser: localStorage (pke.prefs.v1, pke.session.v1),
   IndexedDB (pke-files/handles) for remembered folder handles, and browser preferences.
   Supported media: MP3+G (CD+G), audio with LRC/ELRC lyrics (loose or zipped), and MP4 video.
-  Verification: `npm test` (node:test, 110 tests) and `npm run lint` (ESLint). Prefer
+  Verification: `npm test` (node:test) and `npm run lint` (ESLint); the live test count is tracked in docs/README.md. Prefer
   requirements that are observable behavior covered by tests; note coverage when it exists.
+  A main spec that disagrees with verified behavior is a documentation defect: correct it directly.
   Specifications must not duplicate README.md's module inventory or user-facing tutorial text.
 
 rules:
