@@ -1,5 +1,14 @@
 ## TBD
 
+- Library browsing now has media-type filter chips (CD+G, LRC, MP4, ZIP), a single keyboard tab stop with `↑`/`↓`/`Home`/`End` navigation, `Enter` to queue and `Shift+Enter` to play now, plus clear selected/current/next states in the song list
+- Every song and queue row now shows what it can play (audio format, CD+G, LRC, ELRC, ZIP, MP4), duplicate queue entries are counted, the first queued song is marked "Next", and queue duration is estimated from fast MP3 header reads
+- Skipped-file notices now group problems by cause (missing lyrics, unreadable filename, damaged archive, unreadable folder or file) and explain how to fix each one
+- Artist groups merge alternate spellings of the same name ("The Beatles" / "Beatles, The"), and song rows, queue rows and the current-song card show consistent media capabilities
+- Improved the idle stage with the number of loaded songs and keyboard hints, and moved the toast away from the transport controls
+- Added a "Move to front" queue action and clearer next/current queue markers; queue duration totals note how many entries still have an unknown duration
+- Increased song-row and action-button target sizes, improved muted-text contrast, and added visible focus rings to filter chips and list navigation
+- Added regression tests for media capabilities, filters, diagnostics, duration summaries and MP3 duration estimation
+
 - Added a Background visual selector: Classic keeps the existing dark spectrum, and Hot Pink, Spectrum, Waveform, Aurora, Pulse, Starfield, Minimal and Off are also available. Styles react to the playing audio, switch during playback without touching the playhead or lyrics, and are remembered between visits
 - The stage visualizer now draws a dark, low-opacity blue spectrum instead of a bright magenta one, so lyrics stay legible over it
 - Rewrote the app as a local, dependency-free karaoke player. The browser reads a music folder directly (File System Access API) and plays MP3+G, zipped MP3+G, audio with LRC/ELRC lyrics, and MP4 files; the queue, favourites and display settings are remembered locally
