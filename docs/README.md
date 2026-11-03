@@ -60,7 +60,7 @@ Project-wide artifact rules for OpenSpec changes live in
 Run the live suite rather than trusting a number in prose:
 
 ```bash
-npm test       # 124 tests as of 2026-11-03
+npm test       # 130 tests as of 2026-11-03
 npm run lint
 ```
 
