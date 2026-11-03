@@ -82,6 +82,45 @@ function file (name, bytes = audioBytes) {
   return new File([bytes], name)
 }
 
+function id3TextFrame (id, text) {
+  const body = new Uint8Array(1 + new TextEncoder().encode(text).length)
+  body[0] = 0x00
+  body.set(new TextEncoder().encode(text), 1)
+
+  const frame = new Uint8Array(10 + body.length)
+  const view = new DataView(frame.buffer)
+  for (let i = 0; i < id.length; i++) frame[i] = id.charCodeAt(i)
+  view.setUint32(4, body.length, false)
+  frame.set(body, 10)
+  return frame
+}
+
+function mp3WithId3Tags ({ artist, title }) {
+  const frames = [
+    id3TextFrame('TPE1', artist),
+    id3TextFrame('TIT2', title),
+  ]
+  const totalFrameSize = frames.reduce((sum, frame) => sum + frame.length, 0)
+  const tag = new Uint8Array(10 + totalFrameSize)
+  tag[0] = 0x49
+  tag[1] = 0x44
+  tag[2] = 0x33
+  tag[3] = 0x03
+  tag[4] = 0x00
+  tag[5] = 0x00
+  const size = totalFrameSize
+  tag[6] = (size >> 21) & 0x7f
+  tag[7] = (size >> 14) & 0x7f
+  tag[8] = (size >> 7) & 0x7f
+  tag[9] = size & 0x7f
+  let offset = 10
+  for (const frame of frames) {
+    tag.set(frame, offset)
+    offset += frame.length
+  }
+  return tag
+}
+
 test('parseTrackName matches every legacy MetaParser case', () => {
   for (const { input, output } of trackNameCases) {
     const parsed = parseTrackName(input)
@@ -96,6 +135,29 @@ test('parseTrackName matches every legacy MetaParser case', () => {
       input,
     )
   }
+})
+
+test('parseTrackName strips a trailing karaoke suffix from the title', () => {
+  const parsed = parseTrackName('Artist - Song - Karaoke')
+  assert.equal(parsed.artist, 'Artist')
+  assert.equal(parsed.title, 'Song')
+  assert.equal(parsed.artistNorm, 'Artist')
+  assert.equal(parsed.titleNorm, 'Song')
+})
+
+test('buildLibrary prefers MP3 artist metadata over a numbered filename prefix', async () => {
+  const artist = 'Green Day'
+  const title = "Adam's Song"
+  const tags = mp3WithId3Tags({ artist, title })
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('01 - Adam\'s Song.mp3', tags), path: '01 - Adam\'s Song.mp3' },
+    { file: file('01 - Adam\'s Song.cdg', cdgBytes), path: '01 - Adam\'s Song.cdg' },
+  ])
+
+  assert.equal(warnings.length, 0)
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].artist, artist)
+  assert.equal(tracks[0].title, title)
 })
 
 test('parseTrackName rejects names without an artist/title delimiter', () => {
