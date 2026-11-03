@@ -53,5 +53,5 @@ playback changes, and any rewrite of folder scanning.
 
 Native directory pickers and permission prompts cannot be driven in automated tests. Picker choice,
 permission outcomes, path normalisation and reopen labelling are unit tested; granting, denying or
-revoking access in a real browser remains a manual check (`docs/QA_REPORT_2026-10-29.md` §8 item 2).
+revoking access in a real browser remains a manual check (`docs/archive/QA_REPORT_2026-10-29.md` §8 item 2).
 No browser compatibility is claimed beyond the capability rules in the spec.
