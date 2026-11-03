@@ -20,6 +20,18 @@ import { describeAudioTrack } from './audio-tracks.js'
 import KaraokePlayer from './player.js'
 import { resolveShortcut } from './shortcuts.js'
 import {
+  FOLDER_SOURCE_FALLBACK,
+  FOLDER_SOURCE_HANDLE,
+  describeReopen,
+  ensureReadPermission,
+  folderNameFromRecords,
+  folderPickerNote,
+  folderReadFailed,
+  permissionMessage,
+  resolveFolderSource,
+  stripFolderRoot,
+} from './folder-restore.js'
+import {
   DEFAULT_VISUAL_STYLE,
   normalizeVisualStyle,
   resolveSavedVisualStyle,
@@ -28,6 +40,7 @@ import {
 
 const PREFS_KEY = 'pke.prefs.v1'
 const SESSION_KEY = 'pke.session.v1'
+const FOLDER_KEY = 'pke.folder.v1'
 const DB_NAME = 'pke-files'
 const DB_STORE = 'handles'
 const AUDIO_TRACK_MEMORY = 50
@@ -120,6 +133,7 @@ const state = {
   finished: false,
   error: null,
   folderHandle: null,
+  folderRecord: null,
   dragIndex: null,
   seeking: false,
   lastVolume: prefs.volume || 0.85,
@@ -292,6 +306,35 @@ async function getFolderHandle () {
   } catch {
     return null
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Folder restoration                                                         */
+/* -------------------------------------------------------------------------- */
+
+function currentFolderEnvironment () {
+  return {
+    hasDirectoryPicker: typeof window.showDirectoryPicker === 'function',
+    isSecureContext: Boolean(window.isSecureContext),
+    userAgent: navigator.userAgent,
+  }
+}
+
+/** Remember the last loaded folder so the next visit can offer it again. */
+function rememberFolder (record) {
+  state.folderRecord = record
+  writeJson(FOLDER_KEY, record)
+  renderReopen()
+}
+
+function renderReopen () {
+  const info = describeReopen({
+    ...state.folderRecord,
+    hasHandle: state.folderRecord?.source === FOLDER_SOURCE_HANDLE && Boolean(state.folderHandle),
+  })
+  els.reopenFolder.hidden = info.hidden
+  els.reopenLabel.textContent = info.label
+  els.reopenFolder.title = info.title
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1632,26 +1675,19 @@ function setScanning (value) {
   state.scanning = value
   els.openFolder.disabled = value
   els.addFiles.disabled = value
-  if (state.folderHandle) els.reopenFolder.disabled = value
-}
-
-function shouldUseFileInputFolderPicker () {
-  // VS Code's embedded browser runs on Electron where showDirectoryPicker can
-  // be present but not reliably complete the folder selection flow.
-  return /\bElectron\//.test(navigator.userAgent)
+  els.reopenFolder.disabled = value
 }
 
 async function scanDirectoryHandle (handle) {
-  const permission = await handle.requestPermission({ mode: 'read' })
-  if (permission !== 'granted') {
-    showToast('Folder access was not granted.')
+  const permission = await ensureReadPermission(handle)
+  if (permission.status !== 'granted') {
+    showToast(permissionMessage(permission))
     return
   }
 
   state.folderHandle = handle
   void saveFolderHandle(handle)
-  els.reopenFolder.hidden = false
-  els.reopenLabel.textContent = `Reopen “${handle.name}”`
+  rememberFolder({ name: handle.name, source: FOLDER_SOURCE_HANDLE })
 
   setScanning(true)
   setScanStatus(`Scanning “${handle.name}”…`)
@@ -1665,6 +1701,15 @@ async function scanDirectoryHandle (handle) {
         }
       },
     })
+    // A folder that cannot be read at all must not replace the loaded library.
+    if (folderReadFailed({ records, warnings })) {
+      setScanning(false)
+      setScanStatus('Folder scan failed.')
+      refreshInitialMessage()
+      showToast(`Could not read “${handle.name}”. The current library was left unchanged.`)
+      return
+    }
+
     await scanRecords(records, `“${handle.name}”`, warnings)
   } catch (error) {
     setScanning(false)
@@ -1674,8 +1719,8 @@ async function scanDirectoryHandle (handle) {
   }
 }
 
-async function scanFileList (fileList, { append = false } = {}) {
-  const records = []
+async function scanFileList (fileList, { append = false, folder = false } = {}) {
+  let records = []
 
   for (const file of fileList) {
     if (!SUPPORTED_EXTENSIONS.includes(getExtension(file.name))) continue
@@ -1690,7 +1735,22 @@ async function scanFileList (fileList, { append = false } = {}) {
     return
   }
 
-  await scanRecords(records, 'selected files', [], { append })
+  let sourceLabel = 'selected files'
+
+  if (folder) {
+    const name = folderNameFromRecords(records)
+    if (name) {
+      // The directory input reports the folder name as the first path segment.
+      // Strip it so track ids match a directory-handle scan of the same folder.
+      records = stripFolderRoot(records)
+      sourceLabel = `“${name}”`
+      // A directory input cannot be reopened programmatically, so only the name
+      // is remembered and the next visit asks for the folder again.
+      rememberFolder({ name, source: FOLDER_SOURCE_FALLBACK })
+    }
+  }
+
+  await scanRecords(records, sourceLabel, [], { append })
 }
 
 async function scanRecords (records, sourceLabel, scanWarnings = [], { append = false } = {}) {
@@ -1779,7 +1839,9 @@ async function scanRecords (records, sourceLabel, scanWarnings = [], { append = 
 }
 
 async function openFolder () {
-  if (!window.showDirectoryPicker || !window.isSecureContext || shouldUseFileInputFolderPicker()) {
+  const picker = resolveFolderSource(currentFolderEnvironment())
+
+  if (picker.source !== FOLDER_SOURCE_HANDLE) {
     els.folderInput.click()
     return
   }
@@ -1788,7 +1850,7 @@ async function openFolder () {
     const handle = await window.showDirectoryPicker({ mode: 'read' })
     await scanDirectoryHandle(handle)
   } catch (error) {
-    if (error.name !== 'AbortError') {
+    if (error?.name !== 'AbortError') {
       // If the native picker path fails, fall back to the broadest-compatible
       // directory input so users can still load their library.
       els.folderInput.click()
@@ -1797,12 +1859,22 @@ async function openFolder () {
 }
 
 async function reopenFolder () {
-  if (!state.folderHandle) return
-  try {
-    await scanDirectoryHandle(state.folderHandle)
-  } catch (error) {
-    showToast(`Could not reopen that folder: ${error.message}`)
+  const record = state.folderRecord
+  const canReuseHandle = Boolean(state.folderHandle) && record?.source !== FOLDER_SOURCE_FALLBACK
+
+  if (canReuseHandle) {
+    try {
+      await scanDirectoryHandle(state.folderHandle)
+    } catch (error) {
+      showToast(`Could not reopen that folder: ${error.message}`)
+    }
+    return
   }
+
+  if (!record?.name) return
+
+  showToast(`Choose “${record.name}” again — this browser asks for the folder each visit.`)
+  els.folderInput.click()
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1968,7 +2040,7 @@ function bindEvents () {
   els.addFiles.addEventListener('click', () => els.filesInput.click())
 
   els.folderInput.addEventListener('change', async () => {
-    if (els.folderInput.files?.length) await scanFileList(els.folderInput.files)
+    if (els.folderInput.files?.length) await scanFileList(els.folderInput.files, { folder: true })
     els.folderInput.value = ''
   })
 
@@ -2182,15 +2254,24 @@ async function init () {
   updateTransport()
   refreshInitialMessage()
 
-  const handle = await getFolderHandle()
+  state.folderRecord = readJson(FOLDER_KEY)
+  const handle = state.folderRecord?.source === FOLDER_SOURCE_FALLBACK
+    ? null
+    : await getFolderHandle()
+
   if (handle) {
     state.folderHandle = handle
-    els.reopenFolder.hidden = false
-    els.reopenLabel.textContent = `Reopen “${handle.name}”`
-  } else if (!window.showDirectoryPicker || !window.isSecureContext || shouldUseFileInputFolderPicker()) {
-    // Let people know why the folder button opens a file picker.
-    els.openFolder.title = 'Choose a folder (browser file picker)'
+    if (!state.folderRecord?.name) {
+      state.folderRecord = { name: handle.name, source: FOLDER_SOURCE_HANDLE }
+      writeJson(FOLDER_KEY, state.folderRecord)
+    }
   }
+
+  renderReopen()
+
+  // Explain why Open music folder may use the browser's own directory input.
+  els.openFolder.title = folderPickerNote(resolveFolderSource(currentFolderEnvironment()))
+    || 'Choose your karaoke folder.'
 
   if (state.currentId && state.queue.length) {
     showToast('Saved queue restored. Reopen your folder to play.')
