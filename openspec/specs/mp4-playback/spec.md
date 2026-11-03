@@ -64,4 +64,4 @@ If the browser does not expose the audio-track API (Chromium and Firefox ship it
 - **WHEN** the track loads
 - **THEN** no selector is shown
 
-*(Known gap: native switching with a real multi-audio-track MP4 has been verified only through a simulated API; Safari validation is pending — see docs/QA_REPORT_2026-10-29.md §7.)*
+*(Known gap: native switching with a real multi-audio-track MP4 has been verified only through a simulated API; Safari validation is pending — see docs/archive/QA_REPORT_2026-10-29.md §7.)*
