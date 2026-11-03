@@ -7,6 +7,8 @@ import {
   formatDuration,
   formatSize,
   groupByArtist,
+  mergeTracks,
+  mergeWarnings,
   parseTrackName,
   searchTracks,
 } from '../js/library.js'
@@ -299,6 +301,52 @@ test('buildLibrary ignores AppleDouble entries in zips', async () => {
   assert.equal(tracks[0].title, 'Real Song')
 })
 
+test('buildLibrary ignores AppleDouble entries outside zips', async () => {
+  const { tracks, warnings } = await buildLibrary([
+    { file: file('._Real Artist - Real Song.mp3'), path: '._Real Artist - Real Song.mp3' },
+    { file: file('._Real Artist - Real Song.cdg', cdgBytes), path: '._Real Artist - Real Song.cdg' },
+    { file: file('Real Artist - Real Song.mp3'), path: 'Real Artist - Real Song.mp3' },
+    { file: file('Real Artist - Real Song.cdg', cdgBytes), path: 'Real Artist - Real Song.cdg' },
+  ])
+
+  assert.deepEqual(warnings, [])
+  assert.equal(tracks.length, 1)
+  assert.equal(tracks[0].artist, 'Real Artist')
+})
+
+test('mergeTracks replaces re-added tracks and keeps the library sorted', () => {
+  const existing = [
+    { id: 'one', artistNorm: 'artist', titleNorm: 'alpha', path: 'one' },
+    { id: 'two', artistNorm: 'artist', titleNorm: 'beta', path: 'two' },
+  ]
+  const incoming = [
+    { id: 'two', artistNorm: 'artist', titleNorm: 'beta updated', path: 'two' },
+    { id: 'three', artistNorm: 'artist', titleNorm: 'gamma', path: 'three' },
+  ]
+
+  const merged = mergeTracks(existing, incoming)
+
+  assert.deepEqual(merged.map(track => track.id), ['one', 'two', 'three'])
+  assert.equal(merged[1], incoming[0])
+  assert.equal(existing.length, 2)
+  assert.equal(incoming.length, 2)
+})
+
+test('mergeWarnings deduplicates repeated scan failures', () => {
+  const merged = mergeWarnings(
+    [{ path: 'A - Song.mp3', reason: 'missing .cdg or .lrc file' }],
+    [
+      { path: 'A - Song.mp3', reason: 'missing .cdg or .lrc file' },
+      { path: 'B - Song.zip', reason: 'Not a ZIP file' },
+    ],
+  )
+
+  assert.deepEqual(merged, [
+    { path: 'A - Song.mp3', reason: 'missing .cdg or .lrc file' },
+    { path: 'B - Song.zip', reason: 'Not a ZIP file' },
+  ])
+})
+
 test('buildLibrary warns about zip audio files without a .cdg', async () => {
   const zip = makeZip([
     ['A - One.mp3', [1]],
@@ -567,6 +615,8 @@ test('collectDirectoryRecords walks folders and skips unsupported files', async 
     fakeFileEntry('Queen - Song.cdg'),
     fakeFileEntry('Queen - Song.lrc'),
     fakeFileEntry('Queen - Song.elrc'),
+    fakeFileEntry('._Queen - Song.mp3'),
+    fakeFileEntry('._Queen - Song.cdg'),
     fakeFileEntry('notes.txt'),
     fakeDirEntry('.hidden', [fakeFileEntry('Hidden - Song.mp3')]),
     fakeDirEntry('__MACOSX', [fakeFileEntry('Junk - Song.mp3')]),
