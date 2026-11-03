@@ -65,7 +65,7 @@ Lyrics SHALL highlight the active line, dim past lines, auto-scroll to keep the 
 
 ### Requirement: Malformed lyrics fail visibly and non-fatally
 
-Choosing a track whose `.lrc` contains no timestamped usable lines SHALL show a clear error (for example "no usable lyric lines in the .lrc or .elrc file") without crashing. This validation happens at play time, not at scan time: malformed LRC files still appear in the library. *(Known gap: scan-time validation or an unplayable badge is deferred; see docs/QA_REPORT_2026-10-29.md F5.)*
+Choosing a track whose `.lrc` contains no timestamped usable lines SHALL show a clear error (for example "no usable lyric lines in the .lrc or .elrc file") without crashing. This validation happens at play time, not at scan time: malformed LRC files still appear in the library. *(Known gap: scan-time validation or an unplayable badge is deferred; see docs/archive/QA_REPORT_2026-10-29.md F5.)*
 
 #### Scenario: Empty LRC at play time
 
