@@ -633,15 +633,188 @@ export function searchTracks (tracks, query, favorites = null) {
   return results.map(result => result.track)
 }
 
+/**
+ * Group tracks under one display name per normalized artist. Files that spell
+ * the same act differently ("The Beatles", "Beatles, The", "BEATLES") should
+ * not produce three separate groups in the library.
+ */
 export function groupByArtist (tracks) {
-  const artists = new Map()
+  const groups = new Map()
 
   for (const track of tracks) {
-    if (!artists.has(track.artist)) artists.set(track.artist, [])
-    artists.get(track.artist).push(track)
+    const key = track.artistKey
+      ?? String(track.artistNorm ?? track.artist ?? '').toLowerCase()
+    if (!groups.has(key)) groups.set(key, { name: track.artist, tracks: [] })
+    groups.get(key).tracks.push(track)
+  }
+
+  const artists = new Map()
+  for (const group of groups.values()) {
+    const existing = artists.get(group.name)
+    if (existing) existing.push(...group.tracks)
+    else artists.set(group.name, group.tracks)
   }
 
   return artists
+}
+
+/**
+ * Human-readable capabilities for a track. These describe what the player will
+ * actually use, so a CD+G track shows CD+G even when a stray LRC sits beside
+ * it, and ZIP tracks show both the container and their contents.
+ */
+export function trackMedia (track) {
+  if (!track) return []
+
+  const format = getExtension(track.sourceName ?? track.path ?? '').replace('.', '').toUpperCase()
+  const media = []
+  const add = (label, title, tone) => media.push({ label, title, tone })
+
+  if (track.kind === 'mp4') {
+    add('MP4', 'MP4 video with karaoke lyrics', 'video')
+    return media
+  }
+
+  if (track.kind === 'zip' || track.kind === 'zip-lrc') {
+    add('ZIP', 'Read from a ZIP archive', 'zip')
+  }
+  if (format) add(format, `${format} audio`, 'audio')
+  if (track.kind === 'cdg' || track.kind === 'zip') {
+    add('CD+G', 'CD+G graphics with synchronized lyrics', 'cdg')
+  }
+  if (track.kind === 'lrc' || track.kind === 'zip-lrc') {
+    const hasLrc = track.kind === 'zip-lrc'
+      ? Boolean(track.zipEntries?.lrcEntry)
+      : Boolean(track.lrcFile)
+    const hasElrc = track.kind === 'zip-lrc'
+      ? Boolean(track.zipEntries?.elrcEntry)
+      : Boolean(track.elrcFile)
+    if (hasLrc) add('LRC', 'Synchronized LRC lyrics', 'lyrics')
+    if (hasElrc) add('ELRC', 'Enhanced LRC word-level timing', 'elrc')
+  }
+
+  return media
+}
+
+/** Match a library media filter against a track. */
+export function matchesMediaFilter (track, filter) {
+  switch (filter) {
+    case 'cdg':
+      return track.kind === 'cdg' || track.kind === 'zip'
+    case 'lyrics':
+      return track.kind === 'lrc' || track.kind === 'zip-lrc'
+    case 'video':
+      return track.kind === 'mp4'
+    case 'zip':
+      return track.kind === 'zip' || track.kind === 'zip-lrc'
+    default:
+      return true
+  }
+}
+
+const WARNING_DIAGNOSTICS = [
+  {
+    id: 'missing-companion',
+    test: /missing \.cdg or \.lrc/i,
+    category: 'No lyrics or CD+G',
+    hint: 'Add a .cdg, .lrc, or .elrc file with the same base name as the audio, or remove the audio file from this folder.',
+  },
+  {
+    id: 'unreadable-name',
+    test: /could not determine artist|no artist\/title delimiter|empty artist or title/i,
+    category: 'Unreadable filename',
+    hint: 'Rename the file to “Artist - Title.ext” so the library can split the artist and song name.',
+  },
+  {
+    id: 'empty-archive',
+    test: /archive contains no supported audio/i,
+    category: 'Archive has no audio',
+    hint: 'Re-create the ZIP with an MP3, M4A, WAV, OGG, or FLAC file plus its .cdg or .lrc companion.',
+  },
+  {
+    id: 'bad-archive',
+    test: /zip|archive/i,
+    category: 'Damaged archive',
+    hint: 'Re-download or re-create this ZIP. The rest of the scan continues without it.',
+  },
+  {
+    id: 'unreadable-folder',
+    test: /could not read folder/i,
+    category: 'Unreadable folder',
+    hint: 'Check that the folder still exists and that the browser has permission to read it.',
+  },
+  {
+    id: 'unreadable-file',
+    test: /could not read file/i,
+    category: 'Unreadable file',
+    hint: 'Check the file permissions, or move the file somewhere the browser can read it.',
+  },
+]
+
+function diagnosticFor (reason) {
+  return WARNING_DIAGNOSTICS.find(entry => entry.test.test(reason)) ?? {
+    id: 'other',
+    category: 'Other scan problem',
+    hint: 'Check that the file is valid and try scanning again.',
+  }
+}
+
+/** Turn raw scan warnings into explained, grouped diagnostics. */
+export function diagnoseWarnings (warnings) {
+  const groups = new Map()
+  const items = Array.isArray(warnings) ? warnings : []
+
+  for (const warning of items) {
+    const diagnostic = diagnosticFor(String(warning.reason ?? ''))
+    if (!groups.has(diagnostic.id)) {
+      groups.set(diagnostic.id, {
+        id: diagnostic.id,
+        category: diagnostic.category,
+        hint: diagnostic.hint,
+        items: [],
+      })
+    }
+    groups.get(diagnostic.id).items.push({
+      path: warning.path,
+      displayPath: String(warning.path ?? '').replace('!/', ' → '),
+      reason: warning.reason,
+    })
+  }
+
+  return {
+    total: items.length,
+    groups: [...groups.values()].sort((a, b) => b.items.length - a.items.length),
+  }
+}
+
+/** Add up the durations the library knows about for a set of tracks. */
+export function summarizeDurations (tracks) {
+  let seconds = 0
+  let known = 0
+  let estimated = false
+
+  for (const track of tracks ?? []) {
+    const duration = Number(track?.duration)
+    if (Number.isFinite(duration) && duration > 0) {
+      seconds += duration
+      known++
+      if (track.durationEstimated) estimated = true
+    }
+  }
+
+  const total = tracks?.length ?? 0
+  return { seconds, known, unknown: total - known, total, estimated }
+}
+
+/** Compact "12 min" / "1 hr 5 min" label for queue totals. */
+export function formatQueueDuration (seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return ''
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 1) return '<1 min'
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest ? `${hours} hr ${rest} min` : `${hours} hr`
 }
 
 export function formatDuration (seconds) {
