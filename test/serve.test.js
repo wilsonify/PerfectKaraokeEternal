@@ -53,7 +53,7 @@ test('resolvePath only exposes the application files', () => {
     '/README.md',
     '/test/lrc.test.js',
     '/node_modules/eslint/package.json',
-    '/docs/UPSTREAM_ISSUE_ROADMAP.md',
+    '/docs/archive/QA_REPORT_2026-10-29.md',
     // Traversal that stays inside ROOT but leaves the public directories.
     '/css/../package.json',
     '/js/../.git/config',
