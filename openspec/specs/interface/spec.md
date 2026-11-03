@@ -19,7 +19,7 @@ The song list SHALL use a single roving tab stop. `↑`/`↓` move through visib
 
 ### Requirement: Global keyboard shortcuts
 
-The shortcuts `Space` (play/pause), `←`/`→` (seek 5 s), `N` (next), `P` (previous), `M` (mute), `F` (fullscreen), `/` (focus search) and `Esc` (clear search) SHALL work whenever the document has focus, including after a button, slider or link has been clicked.
+The shortcuts `Space` (play/pause), `←`/`→` (seek 5 s), `N` (next), `P` (previous), `M` (mute), `F` (fullscreen) and `/` (focus search) SHALL work whenever the document has focus, including after a button, slider or link has been clicked. `Esc` SHALL clear the search only while a text field (the search box) has focus; anywhere else it is left to the browser, for example to leave fullscreen.
 
 #### Scenario: Shortcut after clicking a button
 
