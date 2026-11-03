@@ -1,3 +1,4 @@
+import { readMp3Tags } from './audio-tags.js'
 import { readZipDirectory, readZipEntry } from './zip.js'
 import { parseLyrics } from './lrc.js'
 
@@ -105,6 +106,10 @@ function cleanParts (parts) {
       break
     }
   }
+
+  if (parts.length === 2 && /^\d+(?:\.\d+)?$/.test(parts[0].trim())) {
+    parts.shift()
+  }
 }
 
 /**
@@ -115,6 +120,7 @@ export function parseTrackName (name, cfg = {}) {
   const articles = Array.isArray(cfg.articles) ? cfg.articles : ['A', 'An', 'The']
   let parsedName = name.replace(/_/g, ' ').replace(/ {2,}/g, ' ')
   parsedName = parsedName.replace(/[([{](?=[^([{]*$).*(?:karaoke|vocal).*[)\]}]/i, '')
+  parsedName = stripKaraokeSuffix(parsedName)
 
   const inTheStyleOf = parsedName.match(/ in the style of /i)
   const delimiter = cfg.delimiter ?? (inTheStyleOf ? inTheStyleOf[0] : '-')
@@ -141,6 +147,10 @@ export function parseTrackName (name, cfg = {}) {
 
   artist = artist.replace(/^['|"](.*)['|"]$/, '$1')
   title = title.replace(/^['|"](.*)['|"]$/, '$1')
+
+  if (/^\d+(?:\.\d+)?$/.test(artist.trim())) {
+    throw new Error('track number is not an artist in filename')
+  }
 
   const articleLookahead = articles.length ? `(?!${articles.join(' |')} )` : ''
   const artistPattern = new RegExp(`^([\\w ]+), ${articleLookahead}(\\w+ ?\\w+)$`, 'i')
@@ -370,12 +380,23 @@ function zipEntryCandidates (entry, archiveName) {
     : [base, archiveBase]
 }
 
-function parseOrWarn (candidates, warnings, path) {
+async function parseOrWarn (candidates, warnings, path, file = null) {
   for (const candidate of candidates) {
     try {
-      return parseTrackName(candidate)
+      const parsed = parseTrackName(candidate)
+      if (!/^\d+(?:\.\d+)?$/.test(parsed.artist.trim())) return parsed
     } catch {
       // Try the next, less specific name.
+    }
+  }
+
+  const metadata = file ? await readMp3Tags(file) : null
+  if (metadata?.artist && metadata?.title) {
+    return {
+      artist: metadata.artist,
+      artistNorm: normalizeString(metadata.artist),
+      title: metadata.title,
+      titleNorm: normalizeString(metadata.title),
     }
   }
 
@@ -443,10 +464,11 @@ export async function buildLibrary (records, { onProgress } = {}) {
         }
 
         for (const pair of archiveTracks) {
-          const parsed = parseOrWarn(
+          const parsed = await parseOrWarn(
             zipEntryCandidates(pair.audioEntry, record.file.name),
             warnings,
             record.path,
+            record.file,
           )
           if (!parsed) continue
 
@@ -467,10 +489,11 @@ export async function buildLibrary (records, { onProgress } = {}) {
           }))
         }
       } else if (VIDEO_EXTENSIONS.includes(extension)) {
-        const parsed = parseOrWarn(
+        const parsed = await parseOrWarn(
           [getBaseName(record.file.name)],
           warnings,
           record.path,
+          record.file,
         )
         if (!parsed) continue
 
@@ -500,10 +523,11 @@ export async function buildLibrary (records, { onProgress } = {}) {
           continue
         }
 
-        const parsed = parseOrWarn(
+        const parsed = await parseOrWarn(
           [getBaseName(record.file.name)],
           warnings,
           record.path,
+          record.file,
         )
         if (!parsed) continue
 
