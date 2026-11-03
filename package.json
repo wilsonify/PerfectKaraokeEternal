@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@fission-ai/openspec": "^1.16.0",
     "@stylistic/eslint-plugin": "^5.10.0",
     "eslint": "^9.39.4",
     "globals": "^17.6.0"
