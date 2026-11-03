@@ -39,6 +39,10 @@ checklists. Agent-driven flows can use the skills in
 - Behavior that is implemented but unverified (see the gap notes in `lyrics`
   and `mp4-playback`) must stay marked as a gap rather than described as
   working.
+- If a main spec disagrees with verified current behavior, that is a
+  documentation defect: fix the main spec directly and note the correction in
+  the changelog. A change is for behavior that is changing, not for a spec that
+  is merely wrong.
 
 ## How to validate against acceptance criteria
 
@@ -53,9 +57,17 @@ checklists. Agent-driven flows can use the skills in
 npx openspec archive <name> --yes
 ```
 
-Archive only after tasks are checked and tests/lint pass (the archive command
-validates this). The folder moves to `openspec/changes/archive/YYYY-MM-DD-<name>/`
-and its deltas merge into `openspec/specs/`.
+Archive only after tasks are checked and `npm test` / `npm run lint` pass; the
+archive command checks that tracked tasks are ticked, but it does not run the
+suite. The folder moves to `openspec/changes/archive/YYYY-MM-DD-<name>/` and
+its deltas merge into `openspec/specs/`.
+
+A documentation- or tooling-only change with no behavior to specify archives
+with `--skip-specs`:
+
+```bash
+npx openspec archive <name> --yes --skip-specs
+```
 
 ## How to update the changelog
 
