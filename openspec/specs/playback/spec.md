@@ -8,7 +8,7 @@ Describe the transport behavior common to all media: starting, pausing, seeking,
 
 ### Requirement: Transport controls
 
-The transport SHALL provide play/pause, previous and next, seek forward and back (5 seconds per key press), mute, and a seekable progress display. Audio SHALL be the timing source for playback position.
+The transport SHALL provide play/pause, previous and next, seek forward and back (5 seconds per key press), mute, and a seekable progress display. The active media element SHALL be the timing source for playback position: the audio element for CD+G and lyric tracks, the video element for MP4 tracks.
 
 #### Scenario: Pause and resume
 
@@ -55,7 +55,7 @@ A media file that cannot be read or decoded (missing after scan, damaged) SHALL 
 
 ### Requirement: Volume and mute
 
-Volume and mute state SHALL be adjustable in the UI and remembered between visits. Muting SHALL be reversible without losing the previous volume level.
+The transport SHALL expose a volume slider and a mute toggle. The volume level SHALL be remembered between visits, with a muted player stored as volume 0. The level in use before muting is kept in memory only, so after a reload unmuting falls back to the default volume (85%). Muting during a session SHALL be reversible without losing the level that was in use.
 
 #### Scenario: Volume is remembered
 
