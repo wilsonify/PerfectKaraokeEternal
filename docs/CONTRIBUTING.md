@@ -1,91 +1,165 @@
 # Contributing
 
-Concise rules for changing this project without letting behavior, specs and
-docs drift apart. The app stays dependency-free: no runtime dependencies, no
-build step. Validation is always `npm test` + `npm run lint`.
+How to change this project without letting behavior, specifications, tests, and documentation drift
+apart. The app stays local-first, dependency-free at runtime, and build-free.
+
+Start with the [developer guide](DEVELOPER_GUIDE.md) for setup, architecture, and debugging.
+
+## Ground rules
+
+- No runtime dependencies, no build step, no backend, no accounts, no network features.
+- Keep changes focused; unrelated refactors and cleanup belong in their own change.
+- Behavior is specified with OpenSpec **before** it is implemented.
+- `npm test` and `npm run lint` must pass before a change is called done.
+- Documentation is part of the change, not a follow-up.
+
+## Setup
+
+```bash
+npm install    # development tools only (ESLint, OpenSpec CLI)
+npm start      # serve the app at http://localhost:3000
+npm test
+npm run lint
+```
 
 ## When an OpenSpec change is required
 
-Create an OpenSpec change for: new features, behavioral changes, architectural
-changes, and bug fixes that change observable behavior.
+| Change | Proposal required? |
+| --- | --- |
+| New feature or user-visible behavior | Yes |
+| Changed behavior of an existing feature | Yes |
+| Architectural change that affects observable behavior | Yes |
+| Bug fix that changes observable behavior | Yes |
+| Typo, wording, CSS-only polish, test-only change, internal refactor with no behavior change | No |
+| Correcting a spec that misdescribes verified behavior | No — fix the spec directly and note it in the changelog |
+| Moving or rewriting documentation | No |
 
-Skip OpenSpec for: CSS tweaks, typos, test-only or refactor changes that do not
-change observable behavior, and changelog wording. If you are unsure, write the
-spec delta first — if there is nothing observable to specify, there is nothing
-to spec.
+If you are unsure, write the spec delta first. If there is nothing observable to specify, there is
+nothing to propose.
 
-## How to propose a change
+## The workflow
+
+### 1. Create the change
 
 ```bash
-npx openspec new change <kebab-case-name>   # scaffold in openspec/changes/<name>/
-npx openspec status --change <name> --json  # artifact build order
-npx openspec instructions <artifact> --change <name>  # template + rules per artifact
+npx openspec new change <kebab-case-name>
+npx openspec status --change <name>
+npx openspec instructions <artifact> --change <name>
 ```
 
-A change contains `proposal.md` (why/what/out-of-scope), delta specs under
-`specs/<capability>/spec.md` (`## ADDED/MODIFIED/REMOVED Requirements` with
-`#### Scenario:` blocks), optional `design.md`, and `tasks.md` with `- [ ]`
-checklists. Agent-driven flows can use the skills in
-[../.agents/skills/](../.agents/skills/) (`openspec-propose`, `openspec-apply-change`,
-`openspec-archive-change`). Official reference: <https://github.com/Fission-AI/OpenSpec>.
+Allowed artifacts are `proposal`, `specs`, `design`, and `tasks`; `design` is conditional and may
+be skipped when the approach is obvious. Use the templates and rules the CLI prints rather than
+inventing a format.
 
-## How to update specifications
+### 2. Write the artifacts
 
-- Main specs live in `openspec/specs/<capability>/spec.md` and describe only
-  behavior that exists today, using `SHALL` requirements and Given/When/Then
-  scenarios.
-- A change proposes edits as deltas inside its own folder; they are merged into
-  the main specs only when the change is archived.
-- Behavior that is implemented but unverified (see the gap notes in `lyrics`
-  and `mp4-playback`) must stay marked as a gap rather than described as
-  working.
-- If a main spec disagrees with verified current behavior, that is a
-  documentation defect: fix the main spec directly and note the correction in
-  the changelog. A change is for behavior that is changing, not for a spec that
-  is merely wrong.
+- `proposal.md` — why the change is needed, what it does, what is out of scope, and how it will be
+  verified.
+- `specs/<capability>/spec.md` — deltas using `## ADDED Requirements`,
+  `## MODIFIED Requirements`, or `## REMOVED Requirements`, with `### Requirement:` text and
+  `#### Scenario:` blocks. Copy the full existing requirement when modifying it.
+- `design.md` — only when a decision needs a durable record (architecture, storage, trade-offs).
+- `tasks.md` — small, ordered tasks, each stating how it will be verified.
 
-## How to validate against acceptance criteria
+Choose the capability that owns the behavior. Do not duplicate a rule that another capability
+already owns; reference it instead.
 
-1. Implement the tasks; tick `- [x]` in `tasks.md` only when verified.
-2. `npm test` and `npm run lint` must pass (config rule: state how each task is
-   verified).
-3. `npx openspec validate --all --strict` must pass.
+### 3. Implement and verify
 
-## How to archive a completed change
+Implement only what the approved change specifies. Tick `- [x]` in `tasks.md` only after the task's
+verification has actually run.
+
+Required checks:
+
+```bash
+npm test
+npm run lint
+npx openspec validate --all --strict
+```
+
+For browser-only behavior, add the manual checks you performed to the change or the final report,
+including the browser used. A mocked unit test does not verify a browser capability.
+
+### 4. Update specs, changelog, and docs
+
+- Behavior changes update their spec delta in the same change; the delta merges into the main specs
+  at archive time.
+- Main specs describe only behavior that exists today. Mark unverified behavior as a known gap.
+- Add user-visible changes to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md), newest
+  first; group into Added/Changed/Fixed once the section grows.
+- Update the guide affected by the change: [user](USER_GUIDE.md), [administrator](ADMIN_GUIDE.md),
+  [developer](DEVELOPER_GUIDE.md), or [troubleshooting](TROUBLESHOOTING.md).
+- When the test suite size changes, update the count in [the documentation index](README.md). That
+  is the only place the live count is tracked.
+
+### 5. Archive
 
 ```bash
 npx openspec archive <name> --yes
 ```
 
-Archive only after tasks are checked and `npm test` / `npm run lint` pass; the
-archive command checks that tracked tasks are ticked, but it does not run the
-suite. The folder moves to `openspec/changes/archive/YYYY-MM-DD-<name>/` and
-its deltas merge into `openspec/specs/`.
+Archive only after tasks are ticked and the checks above pass; the command verifies tasks but does
+not run the suite. The change folder moves to
+`openspec/changes/archive/YYYY-MM-DD-<name>/` and its deltas merge into `openspec/specs/`.
 
-A documentation- or tooling-only change with no behavior to specify archives
-with `--skip-specs`:
+A tooling- or documentation-only change with no behavior to specify archives with:
 
 ```bash
 npx openspec archive <name> --yes --skip-specs
 ```
 
-## How to update the changelog
+### 6. Confirm the merged result
 
-- Add bullets to the `[Unreleased]` section of [CHANGELOG.md](CHANGELOG.md),
-  newest work first; group into Added/Changed/Fixed once the section grows.
-- Never rewrite released entries. The pre-fork upstream history stays verbatim
-  behind its scope note.
+```bash
+npx openspec validate --all --strict
+npx openspec list --specs
+```
 
-## How to keep documentation synchronized
+Check that the main spec reads as current behavior: no delta headers, no duplicated requirements,
+no stale references.
 
-- A behavior change updates its spec **in the same change**, not later.
-- Historical reports ([QA_REPORT_2026-10-29.md](QA_REPORT_2026-10-29.md),
-  [UX_IMPROVEMENT_REPORT.md](UX_IMPROVEMENT_REPORT.md),
-  [UPSTREAM_ISSUE_ROADMAP.md](UPSTREAM_ISSUE_ROADMAP.md)) are dated records:
-  correct factual errors with an inline dated "superseded/noted" note; do not
-  rewrite them to look current.
-- When the test suite size changes, update the count in
-  [README.md](README.md)'s index entry (Testing and QA) — historical reports
-  keep their own counts.
-- Keep internal links relative and valid; a new top-level document gets an
-  entry in [README.md](README.md).
+## Specification rules
+
+- Use `SHALL` for requirements and Given/When/Then for scenarios.
+- One requirement per behavior; move edge cases into scenarios instead of long paragraphs.
+- Specify observable behavior, not implementation. Do not list modules or functions.
+- Do not duplicate `README.md`'s quick start or the guides' instructions.
+- If verified behavior contradicts a main spec, correct the main spec and note the correction in the
+  changelog. A change proposal is for behavior that is changing, not for a spec that is wrong.
+- Requirements flagged as known gaps must stay flagged until evidence exists.
+
+## Documentation rules
+
+- One obvious place per topic: quick start in the repository README; usage in the user guide; hosting
+  and security in the administrator guide; architecture and workflow in the developer guide;
+  symptoms in troubleshooting.
+- Relative links only, and they must resolve.
+- Dated reports go to [`docs/archive/`](archive/README.md); do not present them as current guidance.
+- Prefer concrete commands and examples over abstract description, and state the browser when a
+  behavior depends on it.
+
+## Code conventions
+
+- ES modules, no semicolons, two-space indentation, single quotes.
+- Keep pure logic in modules outside `js/app.js` so it can be tested without a DOM.
+- No runtime dependencies, no bundler, no framework.
+- Preserve keyboard access and ARIA state when changing interactive UI.
+- Do not add type or lint suppressions to make a check pass; fix the cause.
+
+## Agent skills
+
+Agent-driven workflows can use the OpenSpec skills in
+[`../.agents/skills/`](../.agents/skills/): `openspec-propose`, `openspec-apply-change`,
+`openspec-archive-change`, `openspec-explore`, `openspec-sync-specs`, and `openspec-update-change`.
+They follow the same rules as this document. The official OpenSpec reference is
+<https://github.com/Fission-AI/OpenSpec>.
+
+## Review checklist
+
+- [ ] The change is scoped and matches its proposal.
+- [ ] Unit tests cover the new pure behavior; browser-only paths have recorded manual checks.
+- [ ] `npm test`, `npm run lint`, and `npx openspec validate --all --strict` pass.
+- [ ] Specs describe current behavior and known gaps are marked.
+- [ ] Changelog and the relevant guide are updated.
+- [ ] Links resolve and no obsolete paths remain.
+- [ ] No runtime dependencies, build step, or unrelated cleanup were introduced.
