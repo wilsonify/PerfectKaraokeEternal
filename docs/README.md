@@ -20,7 +20,8 @@ the documentation by purpose so nothing is looked up in the wrong file.
 - [../openspec/specs/](../openspec/specs/) — OpenSpec specifications of
   observable behavior, one folder per capability:
   `media-library`, `playback`, `queue`, `lyrics`, `cdg-playback`,
-  `mp4-playback`, `visuals`, `interface`, `display`, `local-server`.
+  `mp4-playback`, `visuals`, `interface`, `display`,
+  `local-library-restoration`, `local-server`.
 - [../openspec/config.yaml](../openspec/config.yaml) — project context and
   artifact rules applied to every OpenSpec change.
 
@@ -30,7 +31,7 @@ those disagree, fix the stale side — see CONTRIBUTING.md.
 
 ## Testing and QA
 
-- Live suite: run `npm test` (110 tests as of 2026-11-02) and `npm run lint`.
+- Live suite: run `npm test` (124 tests as of 2026-11-03) and `npm run lint`.
   This index is where the current count is tracked; historical reports keep
   their own dated counts.
 - [QA_REPORT_2026-10-29.md](QA_REPORT_2026-10-29.md) — **historical** QA review
