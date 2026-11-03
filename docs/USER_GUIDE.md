@@ -108,7 +108,11 @@ The filename parser understands the conventions karaoke collections tend to use:
 - karaoke markers such as `[Karaoke]` in the name,
 - `Title in the style of Artist`,
 - quoted names, underscores instead of spaces, and right-to-left scripts such as Hebrew,
-- a trailing `(Karaoke)` or ` Karaoke` on the audio name.
+- a trailing `(Karaoke)` or ` Karaoke` on the audio name,
+- a numbered song folder named `<track> - <artist> - <title>` (for example
+  `01 - Eve 6 - Inside Out/`), which supplies the artist for the files inside it when the folder's
+  title matches the file's own; a numbered folder with a different title, such as an album folder,
+  is ignored.
 
 A name that still has no usable artist or title after cleaning (for example
 `The Beatles - [Karaoke]`) is reported as skipped instead of appearing as a blank row.
@@ -123,6 +127,10 @@ A name that still has no usable artist or title after cleaning (for example
 - An audio file named `Artist - Song (Karaoke).mp3` can pair with `Artist - Song.cdg`. If both the
   karaoke variant and a plain `Artist - Song.mp3` exist, the karaoke variant is used and the plain
   duplicate is skipped.
+- A variant with no artist in its name or tags (`01 - Song - Karaoke.mp3`) borrows the artist and
+  title from the same-name source beside it (`01 - Song.mp3`). If that source has no ID3 artist and
+  title tags either, nothing in the folder identifies the song and the variant is reported as an
+  unreadable filename.
 - Standalone `.lrc`, `.elrc`, and `.cdg` files never become songs.
 
 ### Zipped libraries
