@@ -1,0 +1,35 @@
+# The image contains only index.html, css/, js/, assets/ and serve.js.
+# Everything below is kept out of the build context so development artifacts,
+# test fixtures and local secrets cannot reach the image.
+
+# Version control, editor and agent metadata
+.git
+.gitignore
+.github
+.agents
+.freebuff
+.cloud-attachments
+.vscode
+.idea
+
+# Dependencies and development tooling
+node_modules
+package.json
+package-lock.json
+eslint.config.js
+
+# Tests, fixtures and specifications
+test
+openspec
+
+# Documentation (the image serves the app, not its docs)
+docs
+README.md
+LICENSE
+
+# Local artifacts and secrets
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
